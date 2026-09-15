@@ -1,0 +1,62 @@
+<nav class="navbar" [class.scrolled]="scrolled">
+  <div class="nav-inner">
+    <a routerLink="/" class="brand" (click)="closeMenu()"><span class="brand-dot"></span>LiveMarket</a>
+
+    <ul class="nav-links">
+      @if (auth.isLoggedIn()) {
+        <li><a routerLink="/dashboard" routerLinkActive="active" class="nav-link">Dashboard</a></li>
+      }
+      <li><a routerLink="/envivos" routerLinkActive="active" class="nav-link">En Vivos</a></li>
+      <li><a routerLink="/categorias" routerLinkActive="active" class="nav-link">Categorías</a></li>
+      <li><a routerLink="/perfil" routerLinkActive="active" class="nav-link">
+        {{ auth.isLoggedIn() ? 'Mi perfil' : 'Perfiles' }}
+      </a></li>
+    </ul>
+
+    <div class="nav-actions">
+      @if (auth.isLoggedIn()) {
+        <a routerLink="/crear-live" class="btn btn-live btn-sm">🔴 Hacer en vivo</a>
+        <div class="user-chip" routerLink="/dashboard">
+          <div class="user-avatar">{{ auth.initials(auth.currentUser()?.nombre) }}</div>
+          <span class="user-name">{{ auth.currentUser()?.nombre }}</span>
+        </div>
+      } @else {
+        <a routerLink="/login" class="btn btn-ghost btn-sm">Iniciar sesión</a>
+        <a routerLink="/registro" class="btn btn-primary btn-sm">Crear cuenta</a>
+      }
+    </div>
+
+    <button class="menu-btn" (click)="toggleMenu()" [class.open]="menuOpen" aria-label="Abrir menú">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+
+  <!-- Menú móvil desplegable -->
+  <div class="mobile-menu" [class.open]="menuOpen">
+    <ul class="mobile-links">
+      @if (auth.isLoggedIn()) {
+        <li><a routerLink="/dashboard" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Dashboard</a></li>
+      }
+      <li><a routerLink="/envivos" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">En Vivos</a></li>
+      <li><a routerLink="/categorias" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Categorías</a></li>
+      <li><a routerLink="/perfil" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">
+        {{ auth.isLoggedIn() ? 'Mi perfil' : 'Perfiles' }}
+      </a></li>
+    </ul>
+    <div class="mobile-actions">
+      @if (auth.isLoggedIn()) {
+        <a routerLink="/crear-live" class="btn btn-live" style="width:100%" (click)="closeMenu()">🔴 Hacer en vivo</a>
+        <div class="mobile-user" routerLink="/dashboard" (click)="closeMenu()">
+          <div class="user-avatar" style="width:40px;height:40px;font-size:14px">{{ auth.initials(auth.currentUser()?.nombre) }}</div>
+          <div>
+            <div style="font-size:14px;font-weight:700">{{ auth.currentUser()?.nombre }}</div>
+            <div style="font-size:12px;color:var(--text-soft)">Ver dashboard →</div>
+          </div>
+        </div>
+      } @else {
+        <a routerLink="/login" class="btn btn-ghost" style="width:100%" (click)="closeMenu()">Iniciar sesión</a>
+        <a routerLink="/registro" class="btn btn-primary" style="width:100%" (click)="closeMenu()">Crear cuenta</a>
+      }
+    </div>
+  </div>
+</nav>

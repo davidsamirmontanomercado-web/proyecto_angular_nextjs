@@ -1,0 +1,153 @@
+.navbar{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:rgba(247,247,248,.82);
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  border-bottom:1px solid transparent;
+  transition:border-color var(--dur) var(--ease),background var(--dur);
+}
+.navbar.scrolled{border-bottom-color:var(--border-soft);background:rgba(247,247,248,.95)}
+
+.nav-inner{
+  max-width:1240px;margin:0 auto;padding:16px 28px;
+  display:flex;align-items:center;justify-content:space-between;gap:24px;
+  position:relative;
+}
+
+.brand{
+  display:flex;align-items:center;gap:10px;
+  font-size:19px;font-weight:800;letter-spacing:-.6px;color:var(--text);
+  text-decoration:none;white-space:nowrap;
+}
+
+.brand-dot{
+  width:9px;height:9px;border-radius:50%;background:var(--live);
+  box-shadow:0 0 0 0 rgba(255,59,48,.5);
+  animation:pulse 2s infinite;flex-shrink:0;
+}
+@keyframes pulse{
+  0%{box-shadow:0 0 0 0 rgba(255,59,48,.5)}
+  70%{box-shadow:0 0 0 12px rgba(255,59,48,0)}
+  100%{box-shadow:0 0 0 0 rgba(255,59,48,0)}
+}
+
+.nav-links{display:flex;gap:32px;align-items:center;list-style:none;margin:0;padding:0}
+
+.nav-link{
+  font-size:14px;font-weight:500;color:var(--text-soft);
+  position:relative;padding:6px 0;transition:color var(--dur);
+  text-decoration:none;
+}
+.nav-link:hover{color:var(--text)}
+.nav-link.active{color:var(--text);font-weight:600}
+.nav-link.active::after{
+  content:'';position:absolute;left:0;right:0;bottom:-4px;height:2px;
+  background:var(--text);border-radius:2px;
+}
+
+.nav-actions{display:flex;gap:10px;align-items:center}
+
+.user-chip{
+  display:flex;align-items:center;gap:10px;
+  padding:5px 14px 5px 5px;border-radius:100px;
+  background:var(--bg-elev);border:1px solid var(--border);
+  cursor:pointer;transition:all var(--dur);
+  max-width:220px;
+}
+.user-chip:hover{border-color:var(--text);box-shadow:var(--sh-sm)}
+
+.user-avatar{
+  width:30px;height:30px;border-radius:50%;
+  background:linear-gradient(135deg,#1a1a1f,#3a3a44);
+  color:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;letter-spacing:.3px;
+  flex-shrink:0;overflow:hidden;text-overflow:clip;white-space:nowrap;
+}
+
+.user-name{
+  font-size:13px;font-weight:600;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:140px;
+}
+
+/* Botones dentro del navbar */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:11px 20px;border-radius:100px;
+  font-size:14px;font-weight:600;border:1px solid transparent;
+  background:transparent;cursor:pointer;transition:all var(--dur) var(--ease);
+  white-space:nowrap;text-decoration:none;font-family:inherit;
+}
+.btn-sm{padding:8px 16px;font-size:13px}
+.btn-primary{background:var(--text);color:#fff}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(10,10,11,.18)}
+.btn-ghost{background:var(--bg-elev);color:var(--text);border-color:var(--border)}
+.btn-ghost:hover{border-color:var(--text);transform:translateY(-2px)}
+.btn-live{background:var(--live);color:#fff}
+.btn-live:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(255,59,48,.28)}
+
+/* ============= BOTÓN MENÚ HAMBURGUESA ============= */
+.menu-btn{
+  display:none;
+  width:42px;height:42px;border-radius:12px;
+  background:var(--bg-elev);border:1px solid var(--border);
+  cursor:pointer;position:relative;padding:0;
+  flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  transition:all var(--dur) var(--ease);flex-shrink:0;
+}
+.menu-btn:hover{border-color:var(--text)}
+.menu-btn span{
+  display:block;width:20px;height:2.2px;background:var(--text);
+  border-radius:2px;transition:all .3s cubic-bezier(.4,0,.2,1);
+}
+.menu-btn.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.menu-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
+.menu-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+
+/* ============= MENÚ MÓVIL DESPLEGABLE ============= */
+.mobile-menu{
+  max-height:0;overflow:hidden;
+  background:rgba(247,247,248,.98);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border-top:0 solid var(--border-soft);
+  transition:max-height .4s cubic-bezier(.4,0,.2,1),padding .3s ease;
+  padding:0 20px;
+}
+.mobile-menu.open{
+  max-height:520px;
+  padding:16px 20px 24px;
+  border-top-width:1px;
+}
+.mobile-links{list-style:none;padding:0;margin:0 0 14px}
+.mobile-links li{border-bottom:1px solid var(--border-soft)}
+.mobile-links li:last-child{border-bottom:none}
+.mobile-link{
+  display:block;padding:14px 4px;
+  font-size:15px;font-weight:600;color:var(--text-soft);
+  text-decoration:none;transition:color var(--dur);
+}
+.mobile-link:hover{color:var(--text)}
+.mobile-link.active{color:var(--text)}
+
+.mobile-actions{display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px solid var(--border-soft)}
+.mobile-user{
+  display:flex;align-items:center;gap:12px;
+  padding:12px;border-radius:14px;
+  background:var(--bg-elev);border:1px solid var(--border);
+  cursor:pointer;transition:all var(--dur);
+}
+.mobile-user:hover{border-color:var(--text)}
+
+/* ============= RESPONSIVE ============= */
+@media(max-width:960px){
+  .nav-links{display:none}
+  .nav-actions{display:none}
+  .menu-btn{display:flex}
+  .nav-inner{padding:12px 20px}
+}
+
+@media(max-width:520px){
+  .brand{font-size:16px;letter-spacing:-.4px;gap:8px}
+  .nav-inner{padding:12px 16px;gap:12px}
+  .menu-btn{width:40px;height:40px}
+}

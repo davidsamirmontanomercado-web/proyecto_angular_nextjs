@@ -1,0 +1,61 @@
+<div class="auth">
+  <aside class="auth-brand">
+    <div class="auth-brand-inner">
+      <a routerLink="/" class="brand"><span class="brand-dot"></span>LiveMarket</a>
+      <div>
+        <div class="auth-quote">Vende en vivo.<br><span class="dim">Crece sin límites.</span></div>
+        <div class="auth-features">
+          <div class="auth-feature"><span class="bullet"></span> Transmisiones segmentadas por categoría</div>
+          <div class="auth-feature"><span class="bullet"></span> Catálogo integrado en cada en vivo</div>
+          <div class="auth-feature"><span class="bullet"></span> Perfil empresarial verificado</div>
+          <div class="auth-feature"><span class="bullet"></span> Analíticas en tiempo real</div>
+        </div>
+      </div>
+      <div class="copy">© 2025 LiveMarket. Todos los derechos reservados.</div>
+    </div>
+  </aside>
+
+  <main class="auth-form-wrap">
+    <form class="auth-form" (ngSubmit)="onSubmit($event)" novalidate>
+      <h2>Bienvenido de vuelta</h2>
+      <p class="lead">Ingresa tus credenciales para continuar</p>
+
+      @if (errorMsg()) {
+        <div class="alert alert-error show">{{ errorMsg() }}</div>
+      }
+
+      <div class="field">
+        <label class="field-label">Correo electrónico</label>
+        <div class="input-with-icon">
+          <span class="ico">✉️</span>
+          <input type="email" class="field-input" placeholder="tu@empresa.com"
+                 [(ngModel)]="correo" name="correo" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Contraseña</label>
+        <div class="input-with-icon">
+          <span class="ico">🔒</span>
+          <input type="password" class="field-input" placeholder="••••••••"
+                 [(ngModel)]="pass" name="pass" required>
+        </div>
+      </div>
+
+      <div class="auth-options">
+        <label><input type="checkbox"> Recordarme</label>
+        <a href="#">¿Olvidaste tu contraseña?</a>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg">Iniciar sesión</button>
+
+      <div class="divider">o continúa con</div>
+      <div class="social-row">
+        <button type="button" class="social-btn">🔵 Google</button>
+        <button type="button" class="social-btn">🍎 Apple</button>
+      </div>
+
+      <p class="auth-foot">¿No tienes cuenta? <a routerLink="/registro">Regístrate gratis</a></p>
+    </form>
+  </main>
+</div>

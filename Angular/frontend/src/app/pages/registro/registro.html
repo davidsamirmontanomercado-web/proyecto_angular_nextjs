@@ -1,0 +1,84 @@
+<div class="auth">
+  <aside class="auth-brand">
+    <div class="auth-brand-inner">
+      <a routerLink="/" class="brand"><span class="brand-dot"></span>LiveMarket</a>
+      <div>
+        <div class="auth-quote">Crea tu cuenta.<br><span class="dim">Empieza a transmitir hoy.</span></div>
+        <div class="auth-features">
+          <div class="auth-feature"><span class="bullet"></span> Gratis para empezar</div>
+          <div class="auth-feature"><span class="bullet"></span> Verificación empresarial</div>
+          <div class="auth-feature"><span class="bullet"></span> Catálogo ilimitado</div>
+          <div class="auth-feature"><span class="bullet"></span> Analíticas en tiempo real</div>
+        </div>
+      </div>
+      <div class="copy">© 2025 LiveMarket. Todos los derechos reservados.</div>
+    </div>
+  </aside>
+
+  <main class="auth-form-wrap">
+    <form class="auth-form" (ngSubmit)="onSubmit($event)" novalidate>
+      <h2>Crear cuenta</h2>
+      <p class="lead">Completa tus datos para comenzar</p>
+
+      @if (errorMsg()) {
+        <div class="alert alert-error show">{{ errorMsg() }}</div>
+      }
+
+      <div class="field">
+        <label class="field-label">Tipo de cuenta</label>
+        <div class="role-row">
+          <div class="role-opt" [class.active]="role === 'empresa'" (click)="setRole('empresa')">
+            <div class="ic">🏢</div><div class="tt">Empresa</div><div class="sb">Vendo productos o servicios</div>
+          </div>
+          <div class="role-opt" [class.active]="role === 'comprador'" (click)="setRole('comprador')">
+            <div class="ic">🛒</div><div class="tt">Comprador</div><div class="sb">Busco productos o servicios</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Nombre completo o de la empresa</label>
+        <div class="input-with-icon">
+          <span class="ico">👤</span>
+          <input type="text" class="field-input" placeholder="Ej: Muebles Caribe S.A.S"
+                 [(ngModel)]="nombre" name="nombre" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Correo electrónico</label>
+        <div class="input-with-icon">
+          <span class="ico">✉️</span>
+          <input type="email" class="field-input" placeholder="tu@empresa.com"
+                 [(ngModel)]="correo" name="correo" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Contraseña</label>
+        <div class="input-with-icon">
+          <span class="ico">🔒</span>
+          <input type="password" class="field-input" placeholder="Mínimo 6 caracteres"
+                 [(ngModel)]="pass" name="pass" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Confirmar contraseña</label>
+        <div class="input-with-icon">
+          <span class="ico">🔒</span>
+          <input type="password" class="field-input" placeholder="Repite tu contraseña"
+                 [(ngModel)]="pass2" name="pass2" required>
+        </div>
+      </div>
+
+      <div class="auth-options">
+        <label><input type="checkbox" [(ngModel)]="terms" name="terms"> Acepto los <a href="#">términos y condiciones</a></label>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg">Crear cuenta →</button>
+
+      <p class="auth-foot">¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a></p>
+    </form>
+  </main>
+</div>

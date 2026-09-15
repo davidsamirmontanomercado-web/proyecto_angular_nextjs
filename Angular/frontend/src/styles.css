@@ -1,0 +1,32 @@
+/* You can add global styles to this file, and also import other style files */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --bg:#f7f7f8;--bg-elev:#ffffff;--bg-soft:#f2f2f4;
+  --text:#0a0a0b;--text-soft:#5c5c66;--text-mute:#9a9aa3;
+  --border:#e8e8ec;--border-soft:#f0f0f3;
+  --live:#ff3b30;--live-soft:#fff1f0;
+  --ok:#16a34a;--ok-soft:#effcf3;
+  --err:#dc2626;--err-soft:#fef2f2;
+  --r-xs:8px;--r-sm:10px;--r-md:14px;--r-lg:20px;
+  --sh-xs:0 1px 2px rgba(15,15,20,.04);
+  --sh-sm:0 2px 8px rgba(15,15,20,.05);
+  --sh-md:0 6px 24px rgba(15,15,20,.07);
+  --sh-lg:0 20px 60px rgba(15,15,20,.10);
+  --sh-focus:0 0 0 4px rgba(10,10,11,.08);
+  --ff:'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --dur:.3s;--dur-slow:.6s;
+}
+
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{font-family:var(--ff);background:var(--bg);color:var(--text);line-height:1.55;font-size:15px;-webkit-font-smoothing:antialiased;overflow-x:hidden;min-height:100vh}
+img,svg,video{display:block;max-width:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+ul,ol{list-style:none}
+::selection{background:var(--text);color:#fff}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:100px;border:3px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:var(--text-mute)}

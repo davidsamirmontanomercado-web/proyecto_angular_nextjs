@@ -1,0 +1,51 @@
+<app-navbar></app-navbar>
+
+<main class="container page-top" style="padding-bottom:60px">
+  <div class="dash-head">
+    <div>
+      <h1>Hola, {{ nombre }} 👋</h1>
+      <p>Resumen de tu actividad en LiveMarket</p>
+    </div>
+    <div class="dash-actions">
+      <a routerLink="/crear-live" class="btn btn-live">🔴 Hacer en vivo</a>
+      <a routerLink="/envivos" class="btn btn-ghost">Ver en vivos</a>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Seguidores</div><div class="kpi-num">1,240</div><div class="kpi-delta">↑ 12% este mes</div></div>
+    <div class="kpi"><div class="kpi-label">En vivos</div><div class="kpi-num">32</div><div class="kpi-delta">↑ 5 esta semana</div></div>
+    <div class="kpi"><div class="kpi-label">Espectadores</div><div class="kpi-num">8,600</div><div class="kpi-delta">↑ 24% vs mes pasado</div></div>
+    <div class="kpi"><div class="kpi-label">Productos</div><div class="kpi-num">148</div><div class="kpi-delta neutral">Catálogo activo</div></div>
+  </div>
+
+  <div class="dash-grid">
+    <div class="panel">
+      <div class="panel-head"><h3>Últimas transmisiones</h3><a routerLink="/envivos">Ver todas →</a></div>
+      <div class="list">
+        <div class="list-item">
+          <div class="list-thumb">🔴</div>
+          <div class="list-meta"><h4>Lanzamiento colección muebles 2025</h4><p>Hace 12 min · 1.2K espectadores</p></div>
+          <span class="badge badge-live">EN VIVO</span>
+        </div>
+        <div class="list-item">
+          <div class="list-thumb">🎥</div>
+          <div class="list-meta"><h4>Proceso de fabricación de tornos CNC</h4><p>Ayer · 856 espectadores</p></div>
+          <span class="badge badge-soft">Finalizado</span>
+        </div>
+        <div class="list-item">
+          <div class="list-thumb">📦</div>
+          <div class="list-meta"><h4>Remate de maquinaria usada</h4><p>Hace 3 días · 2.4K espectadores</p></div>
+          <span class="badge badge-soft">Finalizado</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Acciones rápidas</h3></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <a routerLink="/crear-live" class="btn btn-primary btn-full">🔴 Crear nuevo en vivo</a>
+        <a routerLink="/perfil" class="btn btn-ghost btn-full">👤 Editar perfil</a>
+        <a routerLink="/categorias" class="btn btn-ghost btn-full">🗂️ Explorar categorías</a>
+        <a routerLink="/configuracion" class="btn btn-ghost btn-full">⚙️ Configuración</a>
+        <button class="btn btn-danger btn-full" (click)="logout()">Cerrar sesión</button>
