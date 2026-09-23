@@ -1,0 +1,46 @@
+<app-navbar></app-navbar>
+
+<main class="container page-top" style="padding-bottom:60px;max-width:760px">
+  <div class="section-head" style="text-align:left">
+    <span class="tag">Cuenta</span>
+    <h2 class="section-title">Configuración</h2>
+    <p class="section-sub" style="margin:0">Administra los datos de tu cuenta y preferencias.</p>
+  </div>
+
+  <div class="panel" style="margin-bottom:20px">
+    <div class="panel-head"><h3>Datos de la cuenta</h3></div>
+    <div class="field">
+      <label class="field-label">Nombre</label>
+      <input type="text" class="field-input" [(ngModel)]="nombre">
+    </div>
+    <div class="field">
+      <label class="field-label">Correo electrónico</label>
+      <input type="email" class="field-input" [value]="correo" disabled>
+      <span class="field-hint">El correo no se puede modificar.</span>
+    </div>
+    <button class="btn btn-primary" (click)="guardar()">Guardar cambios</button>
+  </div>
+
+  <div class="panel" style="margin-bottom:20px">
+    <div class="panel-head"><h3>Preferencias</h3></div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:14px">
+        <div><div style="font-size:13px;font-weight:600">Notificaciones por correo</div><div style="font-size:12px;color:var(--text-soft)">Recibe avisos cuando alguien inicie un en vivo</div></div>
+        <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:14px">
+        <div><div style="font-size:13px;font-weight:600">Modo privado</div><div style="font-size:12px;color:var(--text-soft)">Oculta tu perfil de las búsquedas públicas</div></div>
+        <label class="switch"><input type="checkbox"><span class="switch-track"></span></label>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="border-color:#fecaca">
+    <div class="panel-head"><h3 style="color:var(--err)">Zona de peligro</h3></div>
+    <p style="font-size:13px;color:var(--text-soft);margin-bottom:14px">Estas acciones son permanentes.</p>
+    <button class="btn btn-danger" (click)="logout()">Cerrar sesión</button>
+    <button class="btn btn-danger" style="margin-left:8px" (click)="eliminarCuenta()">Eliminar cuenta</button>
+  </div>
+</main>
+
+<app-footer></app-footer>

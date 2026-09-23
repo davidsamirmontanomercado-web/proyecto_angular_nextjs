@@ -1,0 +1,107 @@
+<div class="auth">
+  <aside class="auth-brand">
+    <div class="auth-brand-inner">
+      <a routerLink="/" class="brand"><span class="brand-dot"></span>LiveMarket</a>
+      <div>
+        <div class="auth-quote">Una nueva contraseña.<br><span class="dim">Más seguridad.</span></div>
+        <div class="auth-features">
+          <div class="auth-feature"><span class="bullet"></span> Crea una contraseña única y segura</div>
+          <div class="auth-feature"><span class="bullet"></span> Medidor de fuerza en tiempo real</div>
+          <div class="auth-feature"><span class="bullet"></span> Recomendaciones de seguridad integradas</div>
+          <div class="auth-feature"><span class="bullet"></span> Acceso inmediato tras el cambio</div>
+        </div>
+      </div>
+      <div class="copy">© 2025 LiveMarket. Todos los derechos reservados.</div>
+    </div>
+  </aside>
+
+  <main class="auth-form-wrap">
+    <div class="auth-form" novalidate>
+      @if (tokenError()) {
+        <div class="error-card">
+          <div class="error-ico">⚠️</div>
+          <h2>Enlace no válido</h2>
+          <p class="lead">{{ tokenError() }}</p>
+          <button type="button" class="btn btn-primary btn-full btn-lg" routerLink="/recuperar-contrasena">
+            Solicitar nuevo enlace
+          </button>
+          <button type="button" class="btn btn-ghost btn-full" routerLink="/login">
+            Volver al inicio de sesión
+          </button>
+        </div>
+      } @else if (exito()) {
+        <div class="success-card">
+          <div class="success-ico">✅</div>
+          <h2>¡Contraseña restablecida!</h2>
+          <p class="lead">Tu contraseña se actualizó correctamente. Ya puedes iniciar sesión con tu nueva contraseña.</p>
+          <button type="button" class="btn btn-primary btn-full btn-lg" (click)="irAlLogin()">
+            Ir a iniciar sesión →
+          </button>
+        </div>
+      } @else if (tokenValido()) {
+        <form (ngSubmit)="onSubmit($event)" novalidate>
+          <div class="back-link">
+            <a routerLink="/login">← Volver a iniciar sesión</a>
+          </div>
+          <h2>Restablecer contraseña</h2>
+          <p class="lead">Ingresa tu nueva contraseña. Asegúrate de que sea segura y fácil de recordar.</p>
+
+          @if (errorMsg()) {
+            <div class="alert alert-error show">{{ errorMsg() }}</div>
+          }
+
+          <div class="field">
+            <label class="field-label">Nueva contraseña</label>
+            <div class="input-with-icon">
+              <span class="ico">🔒</span>
+              <input [type]="mostrarPass() ? 'text' : 'password'" class="field-input" placeholder="••••••••"
+                     [(ngModel)]="pass" name="pass" required>
+              <button type="button" class="toggle-pass" (click)="mostrarPass.set(!mostrarPass())">
+                {{ mostrarPass() ? '🙈' : '👁️' }}
+              </button>
+            </div>
+            @if (pass) {
+              <div class="strength" [attr.data-level]="fuerza()">
+                <div class="strength-bar"></div>
+                <div class="strength-bar"></div>
+                <div class="strength-bar"></div>
+                <div class="strength-bar"></div>
+              </div>
+              <div class="strength-label">Fuerza: <strong>{{ fuerzaLabel() }}</strong></div>
+            }
+          </div>
+
+          <div class="field">
+            <label class="field-label">Confirmar contraseña</label>
+            <div class="input-with-icon">
+              <span class="ico">🔒</span>
+              <input [type]="mostrarPass2() ? 'text' : 'password'" class="field-input" placeholder="••••••••"
+                     [(ngModel)]="pass2" name="pass2" required>
+              <button type="button" class="toggle-pass" (click)="mostrarPass2.set(!mostrarPass2())">
+                {{ mostrarPass2() ? '🙈' : '👁️' }}
+              </button>
+            </div>
+            @if (pass2 && pass !== pass2) {
+              <div class="match-error">Las contraseñas no coinciden</div>
+            }
+            @if (pass2 && pass === pass2) {
+              <div class="match-ok">✓ Coinciden</div>
+            }
+          </div>
+
+          <div class="tips">
+            <div class="tip"><span class="tip-ico">💡</span> Usa al menos 8 caracteres</div>
+            <div class="tip"><span class="tip-ico">💡</span> Combina mayúsculas, minúsculas y números</div>
+            <div class="tip"><span class="tip-ico">💡</span> Evita datos personales (nombre, fecha)</div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full btn-lg" [disabled]="cargando()">
+            {{ cargando() ? 'Guardando...' : 'Restablecer contraseña' }}
+          </button>
+        </form>
+      } @else {
+        <div class="loading">Validando enlace...</div>
+      }
+    </div>
+  </main>
+</div>

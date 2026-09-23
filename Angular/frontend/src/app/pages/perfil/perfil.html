@@ -1,0 +1,129 @@
+<app-navbar></app-navbar>
+
+<main class="container page-top" style="padding-bottom:60px">
+  <div class="profile-hero">
+    <div class="profile-cover"></div>
+    <div class="profile-body">
+      <div class="profile-avatar">{{ initials }}</div>
+      <div class="profile-meta">
+        <div class="profile-name">
+          {{ nombre }} <span class="verified">✓ Verificada</span>
+        </div>
+        <div class="profile-stats">
+          <span>⭐ 4.8</span>
+          <span>📍 Barranquilla</span>
+          <span>🏭 Fabricante</span>
+          <span>👥 1.2K seguidores</span>
+        </div>
+      </div>
+      <a routerLink="/configuracion" class="btn btn-primary btn-sm">Editar perfil</a>
+    </div>
+  </div>
+
+  <div class="tabs" style="display:inline-flex">
+    <button class="tab active">Productos</button>
+    <button class="tab">En vivos</button>
+    <button class="tab">Información</button>
+  </div>
+
+  <div class="live-now">
+    <div class="live-now-left">
+      <div class="live-dot"></div>
+      <div>
+        <h4>EN VIVO AHORA · Lanzamiento colección 2025</h4>
+        <p>1.2K espectadores · Empezó hace 12 minutos</p>
+      </div>
+    </div>
+    <a routerLink="/live" class="btn btn-primary btn-sm">Ver transmisión →</a>
+  </div>
+
+  <h3 style="font-size:19px;font-weight:800;letter-spacing:-.5px;margin:28px 0 18px">Catálogo de productos</h3>
+
+  <div class="grid-3">
+    <div class="live-card">
+      <div class="live-thumb" style="background:linear-gradient(135deg,#ececec,#c8c8d0)"></div>
+      <div class="live-body">
+        <div class="live-cat">Muebles de oficina</div>
+        <div class="live-title">Escritorio ejecutivo en madera</div>
+        <div class="live-desc">$1.200.000 · Entrega inmediata</div>
+      </div>
+    </div>
+    <div class="live-card">
+      <div class="live-thumb" style="background:linear-gradient(135deg,#ececec,#c8c8d0)"></div>
+      <div class="live-body">
+        <div class="live-cat">Muebles de oficina</div>
+        <div class="live-title">Silla ergonómica premium</div>
+        <div class="live-desc">$650.000 · 5 años de garantía</div>
+      </div>
+    </div>
+    <div class="live-card">
+      <div class="live-thumb" style="background:linear-gradient(135deg,#ececec,#c8c8d0)"></div>
+      <div class="live-body">
+        <div class="live-cat">Muebles comerciales</div>
+        <div class="live-title">Vitrina exhibidora de vidrio</div>
+        <div class="live-desc">$890.000 · Fabricación a medida</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="font-size:19px;font-weight:800;letter-spacing:-.5px;margin:40px 0 18px">Información del negocio</h3>
+
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="info-ic">📞</div>
+      <div class="info-body">
+        <div class="info-label">Teléfono</div>
+        <div class="info-value">+57 300 123 4567</div>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="info-ic">📧</div>
+      <div class="info-body">
+        <div class="info-label">Correo</div>
+        <div class="info-value">ventas@mueblescaribe.com</div>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="info-ic">📍</div>
+      <div class="info-body">
+        <div class="info-label">Ubicación</div>
+        <div class="info-value">Barranquilla, Atlántico</div>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="info-ic">🕐</div>
+      <div class="info-body">
+        <div class="info-label">Horario</div>
+        <div class="info-value">Lun - Vie · 8am a 6pm</div>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="info-ic">🚚</div>
+      <div class="info-body">
+        <div class="info-label">Envíos</div>
+        <div class="info-value">A todo el país · Gratis +$500k</div>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="info-ic">💳</div>
+      <div class="info-body">
+        <div class="info-label">Pagos</div>
+        <div class="info-value">Efectivo · Transferencia · TC</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="font-size:19px;font-weight:800;letter-spacing:-.5px;margin:40px 0 18px">Sobre nosotros</h3>
+  <div class="about-card">
+    <p style="font-size:14px;color:var(--text-soft);line-height:1.7;margin:0 0 14px">
+      Fabricamos muebles de alta calidad con más de 15 años de experiencia en el mercado.
+      Nuestra pasión es crear espacios funcionales y elegantes para tu oficina, hogar o negocio.
+    </p>
+    <p style="font-size:14px;color:var(--text-soft);line-height:1.7;margin:0">
+      ✔ Más de 5.000 clientes satisfechos en toda la Costa Caribe · ✔ Garantía extendida en todos nuestros productos ·
+      ✔ Diseño personalizado y fabricación a medida según tus necesidades.
+    </p>
+  </div>
+</main>
+
+<app-footer></app-footer>

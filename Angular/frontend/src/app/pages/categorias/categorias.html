@@ -1,0 +1,21 @@
+<app-navbar></app-navbar>
+
+<main class="container page-top" style="padding-bottom:60px">
+  <div class="section-head">
+    <span class="tag">Categorías</span>
+    <h2 class="section-title">Todo segmentado por tipo de negocio</h2>
+    <p class="section-sub">27 categorías principales con subcategorías.</p>
+  </div>
+
+  <div class="grid-auto">
+    @for (c of categorias; track c.name) {
+      <a routerLink="/envivos" class="cat-card">
+        <div class="cat-icon">{{ c.ic }}</div>
+        <div class="cat-name">{{ c.name }}</div>
+        <div class="cat-count">{{ c.sub }}</div>
+      </a>
+    }
+  </div>
+</main>
+
+<app-footer></app-footer>

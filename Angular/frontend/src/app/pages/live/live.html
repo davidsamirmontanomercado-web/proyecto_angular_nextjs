@@ -1,0 +1,138 @@
+<app-navbar></app-navbar>
+
+<main class="page-top" style="padding-bottom:60px">
+  <div class="container" style="margin-bottom:16px">
+    <a routerLink="/envivos" class="btn btn-ghost btn-sm">← Volver a en vivos</a>
+  </div>
+
+  <div class="player">
+    <div class="player-stage">
+      <div class="ph">Transmisión en vivo · 1.2K espectadores</div>
+
+      <div class="live-badge">🔴 EN VIVO</div>
+      <button class="chat-fab" (click)="toggleChat()" [class.open]="chatVisible">
+        {{ chatVisible ? '✕' : '💬' }}
+      </button>
+      <button class="pc-chat-toggle" (click)="toggleChat()">
+        {{ chatVisible ? '🙈 Ocultar chat' : '💬 Ver chat' }}
+      </button>
+
+      <!-- ============ CHAT PANEL (incluye TODO: lista + input) ============ -->
+      <div class="chat-overlay" [class.hidden]="!chatVisible">
+        <div class="chat-head">
+          <div class="chat-title">💬 Chat en vivo</div>
+          <div class="chat-count">{{ mensajes.length }} mensajes</div>
+        </div>
+        <div class="chat-messages">
+          @for (m of mensajes; track $index) {
+            <div class="bubble" [class.tu]="m.nombre === 'Tú'">
+              <span class="bubble-name">{{ m.nombre }}</span>
+              <span class="bubble-text">{{ m.texto }}</span>
+            </div>
+          }
+        </div>
+        <div class="chat-input-wrap">
+          <input
+            type="text"
+            [(ngModel)]="nuevoMensaje"
+            (keyup.enter)="enviarMensaje()"
+            placeholder="Di algo al chat..."
+            class="chat-field-bottom"
+          >
+          <button class="chat-send-bottom" (click)="enviarMensaje()">➤</button>
+        </div>
+      </div>
+
+      <!-- Side actions móvil -->
+      <div class="side-actions">
+        <button class="side-btn" (click)="toggleLike()" [class.active]="likes">
+          <div class="side-ic">👍</div>
+          <div class="side-lb">1.2K</div>
+        </button>
+        <button class="side-btn" (click)="toggleSub()" [class.active]="suscrito">
+          <div class="side-ic">🔔</div>
+          <div class="side-lb">842</div>
+        </button>
+        <button class="side-btn">
+          <div class="side-ic">💝</div>
+          <div class="side-lb">Regalo</div>
+        </button>
+        <button class="side-btn">
+          <div class="side-ic">🛒</div>
+          <div class="side-lb">Carrito</div>
+        </button>
+      </div>
+
+      <!-- Input FLOTANTE solo para MÓVIL (estilo TikTok) -->
+      <div class="chat-mobile-input">
+        <input
+          type="text"
+          [(ngModel)]="nuevoMensaje"
+          (keyup.enter)="enviarMensaje()"
+          placeholder="Di algo al chat..."
+          class="chat-field-bottom"
+        >
+        <button class="chat-send-bottom" (click)="enviarMensaje()">➤</button>
+      </div>
+
+      <div class="player-ctrls">
+        <div class="ctrl-group">
+          <button class="ctrl-btn" title="Silenciar">🔇</button>
+          <button class="ctrl-btn" title="Calidad">⚙</button>
+        </div>
+        <div class="ctrl-group">
+          <button class="ctrl-btn" title="Reportar">⚑</button>
+          <button class="ctrl-btn" title="Pantalla completa">⛶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container player-meta">
+    <h3>Lanzamiento colección muebles 2025</h3>
+    <p>Muebles Caribe · 1.2K espectadores · Hace 12 min</p>
+    <div class="player-actions">
+      <button class="paction" [class.active]="likes" (click)="toggleLike()">👍 Me gusta</button>
+      <button class="paction">👎 No me interesa</button>
+      <button class="paction">🔗 Compartir</button>
+      <button class="paction" [class.active]="suscrito" (click)="toggleSub()">
+        {{ suscrito ? '🔔 Suscrito' : '🔔 Suscribirse' }}
+      </button>
+      <a routerLink="/perfil" class="paction">👤 Ver perfil</a>
+      <a routerLink="/categorias" class="paction">📦 Ver catálogo</a>
+    </div>
+  </div>
+
+  <!-- ========== EN VIVOS RECOMENDADOS ========== -->
+  <section class="container recs">
+    <div class="recs-head">
+      <div>
+        <div class="recs-tag">🔴 Sigue viendo</div>
+        <h2 class="recs-title">En vivos que te pueden interesar</h2>
+      </div>
+      <a routerLink="/envivos" class="btn btn-ghost btn-sm">Ver todos →</a>
+    </div>
+
+    <div class="recs-grid">
+      @for (v of vivosRecomendados; track v.id) {
+        <a routerLink="/live" class="rec-card">
+          <div class="rec-thumb" [style.background]="v.color">
+            <div class="rec-live">🔴 EN VIVO</div>
+            <div class="rec-viewers">👥 {{ v.espectadores.toLocaleString() }}</div>
+          </div>
+          <div class="rec-body">
+            <div class="rec-cat">{{ v.categoria }}</div>
+            <div class="rec-title">{{ v.titulo }}</div>
+            <div class="rec-meta">
+              <span>{{ v.empresa }}</span>
+              <span>·</span>
+              <span>{{ v.hace }}</span>
+            </div>
+          </div>
+        </a>
+      }
+    </div>
+  </section>
+</main>
+
+<app-footer></app-footer>
