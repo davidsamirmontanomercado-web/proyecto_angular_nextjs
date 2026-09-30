@@ -21,7 +21,10 @@ export class RegistroComponent {
   pass2 = '';
   terms = false;
   role: 'empresa' | 'comprador' = 'empresa';
+  loadingGoogle = signal(false);
   errorMsg = signal('');
+
+  readonly googleLoginUrl = `${this.auth.backendUrl}/google-auth/login`;
 
   setRole(r: 'empresa' | 'comprador') { this.role = r; }
 
@@ -61,5 +64,38 @@ export class RegistroComponent {
 
     this.toast.ok('Cuenta creada con éxito');
     setTimeout(() => this.router.navigateByUrl('/dashboard'), 500);
+  }
+
+  async startGoogleLogin(e: MouseEvent) {
+    if (this.loadingGoogle()) {
+      e.preventDefault();
+      return;
+    }
+    this.loadingGoogle.set(true);
+    this.errorMsg.set('');
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2500);
+      const res = await fetch(this.auth.backendUrl + '/api/auth/login', {
+        method: 'OPTIONS',
+        signal: controller.signal,
+      }).catch(() => null);
+      clearTimeout(timeout);
+
+      if (!res) {
+        this.toast.err('No se puede conectar con Next.js. Revisa que esté corriendo en ' + this.auth.backendUrl);
+        this.errorMsg.set('El servidor Next.js no está respondiendo.\nEjecuta: cd nextjs → npm run dev');
+        this.loadingGoogle.set(false);
+        e.preventDefault();
+        return;
+      }
+    } catch {
+    }
+
+    this.toast.info('Redirigiendo a Google…');
+    setTimeout(() => {
+      window.location.href = this.googleLoginUrl;
+    }, 250);
   }
 }

@@ -1,5 +1,4 @@
 import { Component, inject, OnInit } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
@@ -8,7 +7,7 @@ import { FooterComponent } from '../../shared/footer/footer';
 
 @Component({
   selector: 'app-configuracion',
-  imports: [RouterLink, FormsModule, NavbarComponent, FooterComponent],
+  imports: [FormsModule, NavbarComponent, FooterComponent],
   templateUrl: './configuracion.html',
   styleUrl: './configuracion.css'
 })

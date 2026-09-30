@@ -3,7 +3,10 @@ import { authGuard, guestGuard } from './services/auth.service';
 
 export const routes: Routes = [
   { path: '', loadComponent: () => import('./pages/index/index').then(m => m.IndexComponent) },
+  { path: 'google-auth', loadComponent: () => import('./pages/google-auth/google-auth').then(m => m.default) },
   { path: 'login', canActivate: [guestGuard], loadComponent: () => import('./pages/login/login').then(m => m.LoginComponent) },
+  { path: 'recuperar-contrasena', canActivate: [guestGuard], loadComponent: () => import('./pages/recuperar-contrasena/recuperar-contrasena').then(m => m.RecuperarContrasenaComponent) },
+  { path: 'restablecer-contrasena', canActivate: [guestGuard], loadComponent: () => import('./pages/restablecer-contrasena/restablecer-contrasena').then(m => m.RestablecerContrasenaComponent) },
   { path: 'registro', canActivate: [guestGuard], loadComponent: () => import('./pages/registro/registro').then(m => m.RegistroComponent) },
   { path: 'dashboard', canActivate: [authGuard], loadComponent: () => import('./pages/dashboard/dashboard').then(m => m.DashboardComponent) },
   { path: 'envivos', loadComponent: () => import('./pages/envivos/envivos').then(m => m.EnvivosComponent) },

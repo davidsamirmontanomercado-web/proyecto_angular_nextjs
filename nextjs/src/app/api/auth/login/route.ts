@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/client';
+import { createServerSupabase } from '@/lib/supabase/server';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +25,7 @@ export async function POST(request: Request) {
       );
     }
 
+    const supabase = await createServerSupabase();
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
