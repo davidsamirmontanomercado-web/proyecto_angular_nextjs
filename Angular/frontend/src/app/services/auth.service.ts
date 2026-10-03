@@ -20,21 +20,27 @@ export class AuthService {
   private readonly KEY_REFRESH = 'lm_refresh';
   private router = inject(Router);
 
-  private static resolveBackendUrl(): string {
-    try {
-      const override = localStorage.getItem('lm_backend_url');
-      if (override) return override.replace(/\/+$/, '');
-      const host = window.location.hostname;
-      const port = window.location.port;
-      const protocol = window.location.protocol;
-      if (host === 'localhost' || host === '127.0.0.1' || host === '') {
-        return `${protocol}//localhost:3000`;
-      }
-      return `${protocol}//${window.location.host}`;
-    } catch {
+private static resolveBackendUrl(): string {
+  try {
+    const override = localStorage.getItem('lm_backend_url');
+
+    if (override) {
+      return override.replace(/\/+$/, '');
+    }
+
+    const host = window.location.hostname;
+
+    // Desarrollo local
+    if (host === 'localhost' || host === '127.0.0.1' || host === '') {
       return 'http://localhost:3000';
     }
+
+    // Producción
+    return 'https://backend-15n25avd9-davidsamirmontanomercado-webs-projects.vercel.app';
+  } catch {
+    return 'http://localhost:3000';
   }
+}
 
   readonly backendUrl = AuthService.resolveBackendUrl();
 
