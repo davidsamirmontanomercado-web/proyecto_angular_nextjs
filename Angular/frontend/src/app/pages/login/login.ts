@@ -9,8 +9,7 @@ import { ToastService } from '../../services/toast.service';
   imports: [FormsModule, RouterLink],
   templateUrl: './login.html',
   styleUrl: './login.css'
-})
-export class LoginComponent {
+})export class LoginComponent {
   private auth = inject(AuthService);
   private toast = inject(ToastService);
   private router = inject(Router);
@@ -21,10 +20,11 @@ export class LoginComponent {
   loadingGoogle = signal(false);
   errorMsg = signal('');
 
-  readonly googleLoginUrl = `${this.auth.backendUrl}/google-auth/login`;
+  readonly googleLoginUrl = `${this.auth.backendUrl}/api/auth/google`;
 
   async onSubmit(e: Event) {
     e.preventDefault();
+
     if (this.loading()) return;
 
     this.errorMsg.set('');
@@ -35,7 +35,12 @@ export class LoginComponent {
     }
 
     this.loading.set(true);
-    const res = await this.auth.login(this.correo.trim(), this.pass);
+
+    const res = await this.auth.login(
+      this.correo.trim(),
+      this.pass
+    );
+
     this.loading.set(false);
 
     if (!res.ok) {
@@ -45,39 +50,25 @@ export class LoginComponent {
     }
 
     this.toast.ok('Bienvenido de nuevo');
-    setTimeout(() => this.router.navigateByUrl('/dashboard'), 400);
+
+    setTimeout(() => {
+      this.router.navigateByUrl('/dashboard');
+    }, 400);
   }
 
-  async startGoogleLogin(e: MouseEvent) {
+  startGoogleLogin(e: MouseEvent) {
     if (this.loadingGoogle()) {
       e.preventDefault();
       return;
     }
+
+    e.preventDefault();
+
     this.loadingGoogle.set(true);
     this.errorMsg.set('');
 
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 2500);
-      const res = await fetch(this.auth.backendUrl + '/api/auth/login', {
-        method: 'OPTIONS',
-        signal: controller.signal,
-      }).catch(() => null);
-      clearTimeout(timeout);
-
-      if (!res) {
-        this.toast.err('No se puede conectar con Next.js. Revisa que esté corriendo en ' + this.auth.backendUrl);
-        this.errorMsg.set('El servidor Next.js no está respondiendo.\nEjecuta: cd nextjs → npm run dev');
-        this.loadingGoogle.set(false);
-        e.preventDefault();
-        return;
-      }
-    } catch {
-    }
-
     this.toast.info('Redirigiendo a Google…');
-    setTimeout(() => {
-      window.location.href = this.googleLoginUrl;
-    }, 250);
+
+    window.location.href = this.googleLoginUrl;
   }
 }
