@@ -1,12 +1,24 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase, authCookieOptions } from '@/lib/supabase/server';
 
-function getBaseUrl(request: Request) {
-  const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
-  const proto = request.headers.get('x-forwarded-proto') || 'http';
-  if (host) return `${proto}://${host}`;
+function getBaseUrl(request: Request): string {
   const envSiteUrl = process.env.SITE_URL;
-  if (envSiteUrl) return envSiteUrl.replace(/\/$/, '');
+
+  if (envSiteUrl) {
+    return envSiteUrl.replace(/\/+$/, '');
+  }
+
+  const host =
+    request.headers.get('x-forwarded-host') ||
+    request.headers.get('host');
+
+  const proto =
+    request.headers.get('x-forwarded-proto') || 'http';
+
+  if (host) {
+    return `${proto}://${host}`;
+  }
+
   return 'http://localhost:3000';
 }
 
