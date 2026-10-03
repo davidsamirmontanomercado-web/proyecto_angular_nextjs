@@ -5,7 +5,7 @@ function getBaseUrl(request: Request) {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
   const proto = request.headers.get('x-forwarded-proto') || 'http';
   if (host) return `${proto}://${host}`;
-  const envSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const envSiteUrl = process.env.SITE_URL;
   if (envSiteUrl) return envSiteUrl.replace(/\/$/, '');
   return 'http://localhost:3000';
 }
