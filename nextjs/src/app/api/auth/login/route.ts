@@ -1,17 +1,11 @@
-import { NextResponse } from 'next/server';
+import { cors } from '@/lib/api/http';
 import { createServerSupabase } from '@/lib/supabase/server';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+// Reutiliza la misma allowlist que el resto de rutas (sin `*`).
+const CORS = cors('POST, OPTIONS');
 
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: corsHeaders,
-  });
+export function OPTIONS(request: Request) {
+  return CORS.empty(request);
 }
 
 export async function POST(request: Request) {
@@ -19,9 +13,10 @@ export async function POST(request: Request) {
     const { email, password } = await request.json();
 
     if (!email || !password) {
-      return NextResponse.json(
+      return CORS.json(
+        request,
         { error: 'El correo y la contraseña son obligatorios' },
-        { status: 400, headers: corsHeaders }
+        400
       );
     }
 
@@ -32,31 +27,27 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      console.error('Supabase login error:', error);
+      console.error('Supabase login error:', error.message);
 
-      return NextResponse.json(
+      return CORS.json(
+        request,
         { error: 'Correo o contraseña incorrectos' },
-        { status: 401, headers: corsHeaders }
+        401
       );
     }
 
-    return NextResponse.json(
+    return CORS.json(
+      request,
       {
         message: 'Login exitoso',
         user: data.user,
         session: data.session,
       },
-      {
-        status: 200,
-        headers: corsHeaders,
-      }
+      200
     );
   } catch (error) {
     console.error('Error en login:', error);
 
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500, headers: corsHeaders }
-    );
+    return CORS.json(request, { error: 'Error interno del servidor' }, 500);
   }
 }

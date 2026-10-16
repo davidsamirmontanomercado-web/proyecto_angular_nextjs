@@ -65,7 +65,7 @@ export interface TransmisionesQuery {
 }
 
 /** Línea de negocio (slug almacenado en la BD). */
-export type LineaNegocio = 'ventas' | 'produccion' | 'usados';
+export type LineaNegocio = 'ventas_nuevos' | 'produccion' | 'usados';
 
 /** Campos aceptados al crear. `id`, `anfitrion_id`, `estado`, `empresa_id` y
  *  `fecha_inicio` los fija el backend (fecha_inicio se establece al iniciar). */

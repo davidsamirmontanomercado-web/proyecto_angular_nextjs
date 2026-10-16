@@ -20,6 +20,11 @@ export class AuthService {
   private readonly KEY_REFRESH = 'lm_refresh';
   private router = inject(Router);
 
+  // Generación de sesión: se incrementa al cerrar/limpiar, de modo que un
+  // refresco en curso no pueda restaurar una sesión ya cerrada.
+  private sessionGeneration = 0;
+  private refreshInFlight: Promise<boolean> | null = null;
+
 private static resolveBackendUrl(): string {
   try {
     const override = localStorage.getItem('lm_backend_url');
@@ -53,7 +58,12 @@ private static resolveBackendUrl(): string {
     )}`;
 
   readonly currentUser = signal<User | null>(this.loadUser());
-  readonly isLoggedIn = computed(() => this.currentUser() !== null);
+  private readonly tokenSignal = signal<string | null>(this.getToken());
+  // Una sesión sólo es válida si hay usuario Y access_token: evita el falso
+  // "logueado" cuando el registro deja lm_user pero sin token.
+  readonly isLoggedIn = computed(
+    () => this.currentUser() !== null && this.tokenSignal() !== null
+  );
 
   private loadUser(): User | null {
     try { return JSON.parse(localStorage.getItem(this.KEY_USER) || 'null'); }
@@ -71,13 +81,79 @@ private static resolveBackendUrl(): string {
 
   setSession(user: User, token?: string, refreshToken?: string) {
     localStorage.setItem(this.KEY_USER, JSON.stringify(user));
-    if (token) localStorage.setItem(this.KEY_TOKEN, token);
+    if (token) {
+      localStorage.setItem(this.KEY_TOKEN, token);
+      this.tokenSignal.set(token);
+    }
     if (refreshToken) localStorage.setItem(this.KEY_REFRESH, refreshToken);
     this.currentUser.set(user);
   }
 
   getToken(): string | null {
     return localStorage.getItem(this.KEY_TOKEN);
+  }
+
+  /** Limpia la sesión e invalida cualquier refresco en curso. */
+  clearSession() {
+    this.sessionGeneration++;
+    localStorage.removeItem(this.KEY_USER);
+    localStorage.removeItem(this.KEY_TOKEN);
+    localStorage.removeItem(this.KEY_REFRESH);
+    this.currentUser.set(null);
+    this.tokenSignal.set(null);
+  }
+
+  /**
+   * Renueva el access_token usando el refresh_token guardado.
+   * Single-flight: las llamadas concurrentes comparten la misma promesa.
+   * Si el usuario cierra sesión durante la renovación (cambia la generación),
+   * no se restaura la sesión.
+   */
+  async refresh(): Promise<boolean> {
+    if (this.refreshInFlight) return this.refreshInFlight;
+
+    const rt = localStorage.getItem(this.KEY_REFRESH);
+    if (!rt) return false;
+
+    const gen = this.sessionGeneration;
+    this.refreshInFlight = (async () => {
+      try {
+        const res = await fetch(`${this.backendUrl}/api/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({ refresh_token: rt }),
+        });
+
+        if (!res.ok) {
+          if (gen === this.sessionGeneration) this.clearSession();
+          return false;
+        }
+
+        const body = await res.json().catch(() => null);
+        const session = body?.session;
+
+        if (!session?.access_token || gen !== this.sessionGeneration) {
+          if (gen === this.sessionGeneration) this.clearSession();
+          return false;
+        }
+
+        localStorage.setItem(this.KEY_TOKEN, session.access_token);
+        if (session.refresh_token) {
+          localStorage.setItem(this.KEY_REFRESH, session.refresh_token);
+        }
+        this.tokenSignal.set(session.access_token);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        this.refreshInFlight = null;
+      }
+    })();
+
+    return this.refreshInFlight;
   }
 
   register(data: { nombre: string; correo: string; pass: string; rol: 'empresa' | 'comprador' }): { ok: boolean; error?: string } {
@@ -91,6 +167,64 @@ private static resolveBackendUrl(): string {
     const { pass, ...safe } = stored;
     this.setSession(safe);
     return { ok: true };
+  }
+
+  /**
+   * Registro real contra Supabase Auth (vía /api/auth/register).
+   * Sólo crea sesión si el backend devuelve un access_token válido; si hace
+   * falta confirmar el correo, no se considera autenticado.
+   */
+  async registerRemote(data: {
+    nombre: string;
+    correo: string;
+    pass: string;
+    rol: 'empresa' | 'comprador';
+  }): Promise<{ ok: boolean; error?: string; confirmationRequired?: boolean }> {
+    try {
+      const res = await fetch(`${this.backendUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const body = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        return { ok: false, error: body?.error || `Error ${res.status}` };
+      }
+
+      const info = body?.data;
+
+      if (info?.confirmationRequired) {
+        return { ok: true, confirmationRequired: true };
+      }
+
+      const rawUser = info?.user;
+      const session = info?.session;
+
+      if (!rawUser?.id || !session?.access_token) {
+        return { ok: false, error: 'Respuesta inválida del servidor.' };
+      }
+
+      const user: User = {
+        id: rawUser.id,
+        nombre: data.nombre,
+        correo: rawUser.email || data.correo,
+        rol: data.rol,
+        createdAt: Date.now(),
+      };
+
+      this.setSession(user, session.access_token, session.refresh_token);
+      return { ok: true, confirmationRequired: false };
+    } catch {
+      return {
+        ok: false,
+        error: 'No se pudo conectar con el servidor. Revisa la conexión o la URL del backend.',
+      };
+    }
   }
 
   async login(correo: string, pass: string): Promise<{ ok: boolean; error?: string; user?: User }> {
@@ -141,10 +275,7 @@ private static resolveBackendUrl(): string {
   }
 
   logout() {
-    localStorage.removeItem(this.KEY_USER);
-    localStorage.removeItem(this.KEY_TOKEN);
-    localStorage.removeItem(this.KEY_REFRESH);
-    this.currentUser.set(null);
+    this.clearSession();
     this.router.navigateByUrl('/login');
   }
 

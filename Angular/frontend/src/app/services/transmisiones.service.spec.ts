@@ -59,7 +59,7 @@ describe('TransmisionesService', () => {
   it('POST crea una transmisión con linea_negocio y categoria_id', () => {
     const payload = {
       titulo: 'Nuevo live',
-      linea_negocio: 'ventas' as const,
+      linea_negocio: 'ventas_nuevos' as const,
       categoria_id: '33333333-3333-3333-3333-333333333333'
     };
     let recibido: unknown;

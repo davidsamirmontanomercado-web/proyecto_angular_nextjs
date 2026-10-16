@@ -1,4 +1,5 @@
 import { Component, inject, OnInit } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ToastService } from '../../services/toast.service';
@@ -24,7 +25,7 @@ export class CrearLiveComponent implements OnInit {
 
   // Líneas de negocio válidas (slug -> etiqueta visible).
   readonly lineasNegocio: { valor: LineaNegocio; etiqueta: string }[] = [
-    { valor: 'ventas', etiqueta: 'Ventas — Productos nuevos' },
+    { valor: 'ventas_nuevos', etiqueta: 'Ventas — Productos nuevos' },
     { valor: 'produccion', etiqueta: 'Producción — Fábrica / Proceso' },
     { valor: 'usados', etiqueta: 'Usados — Productos usados' }
   ];
@@ -95,11 +96,30 @@ export class CrearLiveComponent implements OnInit {
           this.toast.ok('Transmisión creada · prográmala e iníciala');
           setTimeout(() => this.router.navigateByUrl('/dashboard'), 700);
         },
-        error: (err) => {
+        error: (err: HttpErrorResponse) => {
           this.enviando = false;
-          console.error('Error al crear la transmisión:', err);
-          this.toast.err(err?.error?.error || 'No se pudo crear la transmisión.');
+          console.error('Error al crear la transmisión:', err.status);
+          this.toast.err(this.mensajeDeError(err));
         }
       });
+  }
+
+  /** Traduce el estado HTTP a un mensaje claro para el usuario. */
+  private mensajeDeError(err: HttpErrorResponse): string {
+    const s = err.status;
+    if (s === 0) return 'No se pudo conectar con el servidor. Revisa tu conexión.';
+    if (s === 400) return this.mensajeServidor(err) || 'Revisa los datos del formulario.';
+    if (s === 401) return this.mensajeServidor(err) || 'Tu sesión expiró. Inicia sesión de nuevo.';
+    if (s === 403) return 'No tienes permisos para esta operación.';
+    if (s >= 500) return 'El servidor no está disponible. Inténtalo más tarde.';
+    return 'No se pudo crear la transmisión.';
+  }
+
+  private mensajeServidor(err: HttpErrorResponse): string | null {
+    const cuerpo = err.error;
+    if (cuerpo && typeof cuerpo === 'object' && typeof cuerpo.error === 'string') {
+      return cuerpo.error;
+    }
+    return null;
   }
 }

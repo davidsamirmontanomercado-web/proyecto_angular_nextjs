@@ -76,7 +76,9 @@
         <label><input type="checkbox" [(ngModel)]="terms" name="terms"> Acepto los <a href="#">términos y condiciones</a></label>
       </div>
 
-      <button type="submit" class="btn btn-primary btn-full btn-lg">Crear cuenta →</button>
+      <button type="submit" class="btn btn-primary btn-full btn-lg" [disabled]="enviando()">
+        {{ enviando() ? 'Creando cuenta…' : 'Crear cuenta →' }}
+      </button>
 
       <div class="divider">o regístrate con</div>
       <div class="social-row">

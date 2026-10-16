@@ -22,13 +22,14 @@ export class RegistroComponent {
   terms = false;
   role: 'empresa' | 'comprador' = 'empresa';
   loadingGoogle = signal(false);
+  enviando = signal(false);
   errorMsg = signal('');
 
   readonly googleLoginUrl = `${this.auth.backendUrl}/google-auth/login`;
 
   setRole(r: 'empresa' | 'comprador') { this.role = r; }
 
-  onSubmit(e: Event) {
+  async onSubmit(e: Event) {
     e.preventDefault();
     this.errorMsg.set('');
 
@@ -49,16 +50,25 @@ export class RegistroComponent {
       return;
     }
 
-    const res = this.auth.register({
+    if (this.enviando()) return;
+    this.enviando.set(true);
+    const res = await this.auth.registerRemote({
       nombre: this.nombre.trim(),
       correo: this.correo.trim(),
       pass: this.pass,
       rol: this.role
     });
+    this.enviando.set(false);
 
     if (!res.ok) {
       this.errorMsg.set(res.error || 'Error');
       this.toast.err(res.error || 'Error');
+      return;
+    }
+
+    if (res.confirmationRequired) {
+      this.toast.info('Revisa tu correo para confirmar tu cuenta.');
+      setTimeout(() => this.router.navigateByUrl('/login'), 700);
       return;
     }
 
