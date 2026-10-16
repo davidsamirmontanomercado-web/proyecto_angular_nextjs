@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase, authCookieOptions } from '@/lib/supabase/server';
+import { getAllowedOrigins } from '@/lib/api/http';
 
 function getBaseUrl(request: Request): string {
   const envSiteUrl = process.env.SITE_URL;
@@ -22,13 +23,29 @@ function getBaseUrl(request: Request): string {
   return 'http://localhost:3000';
 }
 
-function getAngularUrl(): string {
-  const KNOWN_ANGULAR_URLS = [
-    process.env.NEXT_PUBLIC_ANGULAR_URL,
-    'https://frontend-three-wine-12.vercel.app',
-    'http://localhost:4200',
-  ].filter(Boolean) as string[];
-  return KNOWN_ANGULAR_URLS[0].replace(/\/+$/, '');
+function readCookie(request: Request, name: string): string | null {
+  const header = request.headers.get('cookie');
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx === -1) continue;
+    const key = part.slice(0, idx).trim();
+    if (key === name) return decodeURIComponent(part.slice(idx + 1).trim());
+  }
+  return null;
+}
+
+// Base del frontend a la que volver. Usa la cookie `oauth_origin` fijada por
+// /api/auth/google, validándola SIEMPRE contra la allowlist (anti open-redirect).
+// Si no existe o no es válida, cae al primer origen permitido.
+function resolveAngularBase(request: Request): string {
+  const allowed = getAllowedOrigins();
+  const fromCookie = readCookie(request, 'oauth_origin');
+  if (fromCookie) {
+    const normalized = fromCookie.replace(/\/+$/, '');
+    if (allowed.includes(normalized)) return normalized;
+  }
+  return allowed[0].replace(/\/+$/, '');
 }
 
 export async function GET(request: Request) {
@@ -86,13 +103,15 @@ export async function GET(request: Request) {
     } catch {
       userB64 = encodeURIComponent(json);
     }
-    const angularBase = getAngularUrl();
+    const angularBase = resolveAngularBase(request);
     const successUrl = new URL(`${angularBase}/google-auth`);
     successUrl.searchParams.set('user', userB64);
     successUrl.searchParams.set('at', access_token);
     successUrl.searchParams.set('rt', refresh_token || '');
 
     const next = NextResponse.redirect(successUrl);
+    // La cookie de origen ya no hace falta: se limpia para no reutilizarla.
+    next.cookies.set('oauth_origin', '', { path: '/api/auth', maxAge: 0 });
     next.cookies.set('sb-access-token', access_token, authCookieOptions(expires_in));
     next.cookies.set('sb-refresh-token', refresh_token!, authCookieOptions(60 * 60 * 24 * 30));
     if (user?.email) {

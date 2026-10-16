@@ -20,7 +20,7 @@ import { ToastService } from '../../services/toast.service';
   loadingGoogle = signal(false);
   errorMsg = signal('');
 
-  readonly googleLoginUrl = `${this.auth.backendUrl}/api/auth/google`;
+  readonly googleLoginUrl = this.auth.googleLoginUrl;
 
   async onSubmit(e: Event) {
     e.preventDefault();

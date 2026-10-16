@@ -44,6 +44,14 @@ private static resolveBackendUrl(): string {
 
   readonly backendUrl = AuthService.resolveBackendUrl();
 
+  // URL de inicio de login con Google. Se envía el origen actual del navegador
+  // para que el backend pueda validarlo contra su allowlist y volver a él tras
+  // el callback (local o desplegado), sin hardcodear un único frontend.
+  readonly googleLoginUrl =
+    `${this.backendUrl}/api/auth/google?origin=${encodeURIComponent(
+      typeof window !== 'undefined' ? window.location.origin : ''
+    )}`;
+
   readonly currentUser = signal<User | null>(this.loadUser());
   readonly isLoggedIn = computed(() => this.currentUser() !== null);
 
