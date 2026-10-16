@@ -36,7 +36,7 @@ private static resolveBackendUrl(): string {
     }
 
     // Producción
-    return 'https://backend-15n25avd9-davidsamirmontanomercado-webs-projects.vercel.app';
+    return 'https://backend-one-liard-61.vercel.app';
   } catch {
     return 'http://localhost:3000';
   }
