@@ -13,31 +13,44 @@
   </div>
 
   <div class="kpi-grid">
-    <div class="kpi"><div class="kpi-label">Seguidores</div><div class="kpi-num">1,240</div><div class="kpi-delta">↑ 12% este mes</div></div>
-    <div class="kpi"><div class="kpi-label">En vivos</div><div class="kpi-num">32</div><div class="kpi-delta">↑ 5 esta semana</div></div>
-    <div class="kpi"><div class="kpi-label">Espectadores</div><div class="kpi-num">8,600</div><div class="kpi-delta">↑ 24% vs mes pasado</div></div>
-    <div class="kpi"><div class="kpi-label">Productos</div><div class="kpi-num">148</div><div class="kpi-delta neutral">Catálogo activo</div></div>
+    <div class="kpi"><div class="kpi-label">Transmisiones</div><div class="kpi-num">{{ totalTransmisiones() | number }}</div><div class="kpi-delta neutral">En total</div></div>
+    <div class="kpi"><div class="kpi-label">En vivo ahora</div><div class="kpi-num">{{ enVivo() | number }}</div><div class="kpi-delta neutral">Activas</div></div>
+    <div class="kpi"><div class="kpi-label">Espectadores</div><div class="kpi-num">{{ espectadoresTotales() | number }}</div><div class="kpi-delta neutral">Acumulado</div></div>
+    <div class="kpi"><div class="kpi-label">Finalizadas</div><div class="kpi-num">{{ finalizadas() | number }}</div><div class="kpi-delta neutral">Histórico</div></div>
   </div>
 
   <div class="dash-grid">
     <div class="panel">
-      <div class="panel-head"><h3>Últimas transmisiones</h3><a routerLink="/envivos">Ver todas →</a></div>
+      <div class="panel-head">
+        <h3>Mis transmisiones</h3>
+        <a href="#" (click)="cargarMias(); $event.preventDefault()">Actualizar →</a>
+      </div>
       <div class="list">
-        <div class="list-item">
-          <div class="list-thumb">🔴</div>
-          <div class="list-meta"><h4>Lanzamiento colección muebles 2025</h4><p>Hace 12 min · 1.2K espectadores</p></div>
-          <span class="badge badge-live">EN VIVO</span>
-        </div>
-        <div class="list-item">
-          <div class="list-thumb">🎥</div>
-          <div class="list-meta"><h4>Proceso de fabricación de tornos CNC</h4><p>Ayer · 856 espectadores</p></div>
-          <span class="badge badge-soft">Finalizado</span>
-        </div>
-        <div class="list-item">
-          <div class="list-thumb">📦</div>
-          <div class="list-meta"><h4>Remate de maquinaria usada</h4><p>Hace 3 días · 2.4K espectadores</p></div>
-          <span class="badge badge-soft">Finalizado</span>
-        </div>
+        @if (cargando()) {
+          <div class="list-item">
+            <div class="list-meta"><p>Cargando…</p></div>
+          </div>
+        } @else if (misTransmisiones().length === 0) {
+          <div class="list-item">
+            <div class="list-meta"><h4>Aún no tienes transmisiones</h4><p>Crea tu primer en vivo para verlo aquí.</p></div>
+          </div>
+        } @else {
+          @for (t of misTransmisiones(); track t.id) {
+            <div class="list-item">
+              <div class="list-thumb">{{ icono(t.estado) }}</div>
+              <div class="list-meta">
+                <h4>{{ t.titulo || 'Sin título' }}</h4>
+                <p>{{ meta(t) }}</p>
+              </div>
+              <span [class]="claseBadge(t.estado)">{{ etiqueta(t.estado) }}</span>
+              @if (t.estado === 'programada') {
+                <button class="btn btn-live" style="margin-left:12px" [disabled]="accionandoId() === t.id" (click)="iniciar(t.id)">Iniciar</button>
+              } @else if (t.estado === 'en_vivo') {
+                <button class="btn btn-danger" style="margin-left:12px" [disabled]="accionandoId() === t.id" (click)="finalizar(t.id)">Finalizar</button>
+              }
+            </div>
+          }
+        }
       </div>
     </div>
 

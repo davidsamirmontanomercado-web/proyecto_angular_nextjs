@@ -4,18 +4,30 @@
   <div class="section-head">
     <span class="tag">Categorías</span>
     <h2 class="section-title">Todo segmentado por tipo de negocio</h2>
-    <p class="section-sub">27 categorías principales con subcategorías.</p>
-  </div>
 
-  <div class="grid-auto">
-    @for (c of categorias; track c.name) {
-      <a routerLink="/envivos" class="cat-card">
-        <div class="cat-icon">{{ c.ic }}</div>
-        <div class="cat-name">{{ c.name }}</div>
-        <div class="cat-count">{{ c.sub }}</div>
-      </a>
+    @if (loading) {
+      <p class="section-sub">Cargando categorías...</p>
+    } @else if (error) {
+      <p class="section-sub" role="alert">{{ error }}</p>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="cargar()">Reintentar</button>
+    } @else if (categorias.length === 0) {
+      <p class="section-sub">No hay categorías disponibles por el momento.</p>
+    } @else {
+      <p class="section-sub">{{ categorias.length }} categorías principales con subcategorías.</p>
     }
   </div>
+
+  @if (!loading && !error && categorias.length > 0) {
+    <div class="grid-auto">
+      @for (c of categorias; track c.id) {
+        <a routerLink="/envivos" class="cat-card">
+          <div class="cat-icon">{{ c.ic }}</div>
+          <div class="cat-name">{{ c.name }}</div>
+          <div class="cat-count">{{ c.sub }}</div>
+        </a>
+      }
+    </div>
+  }
 </main>
 
 <app-footer></app-footer>

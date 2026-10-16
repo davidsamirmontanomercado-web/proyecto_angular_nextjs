@@ -11,55 +11,55 @@
   <form class="panel" (ngSubmit)="onSubmit($event)">
     <div class="field">
       <label class="field-label">Línea de negocio <span class="req">*</span></label>
-      <select class="field-select">
-        <option>Ventas — Productos nuevos</option>
-        <option>Producción — Fábrica / Proceso</option>
-        <option>Usados — Productos usados</option>
+      <select name="linea_negocio" class="field-select" [(ngModel)]="form.linea_negocio" required>
+        <option value="">Seleccionar línea de negocio</option>
+        @for (l of lineasNegocio; track l.valor) {
+          <option [value]="l.valor">{{ l.etiqueta }}</option>
+        }
       </select>
     </div>
 
     <div class="field">
       <label class="field-label">Título del LIVE <span class="req">*</span></label>
-      <input type="text" class="field-input" placeholder="Ej: Lanzamiento colección muebles 2025" required>
+      <input type="text" name="titulo" class="field-input" placeholder="Ej: Lanzamiento colección muebles 2025" [(ngModel)]="form.titulo" required>
     </div>
 
     <div class="field">
       <label class="field-label">Descripción <span class="req">*</span></label>
-      <textarea class="field-textarea" placeholder="Describe de qué tratará tu transmisión..." required></textarea>
+      <textarea name="descripcion" class="field-textarea" placeholder="Describe de qué tratará tu transmisión..." [(ngModel)]="form.descripcion" required></textarea>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="field">
         <label class="field-label">Categoría <span class="req">*</span></label>
-        <select class="field-select">
-          <option>Seleccionar categoría</option>
-          <option>Muebles y oficina</option>
-          <option>Maquinaria industrial</option>
-          <option>Tecnología</option>
+        <select name="categoria_id" class="field-select" [(ngModel)]="form.categoria_id">
+          <option value="">Seleccionar categoría</option>
+          @for (c of categorias; track c.id) {
+            <option [value]="c.id">{{ c.nombre }}</option>
+          }
         </select>
       </div>
       <div class="field">
         <label class="field-label">Subcategoría</label>
-        <select class="field-select">
-          <option>Seleccionar subcategoría</option>
-          <option>Escritorios</option>
-          <option>Sillas</option>
-          <option>Archivadores</option>
+        <select name="subcategoria" class="field-select" [(ngModel)]="form.subcategoria">
+          <option value="">Seleccionar subcategoría</option>
+          @for (s of subcategorias; track s) {
+            <option [value]="s">{{ s }}</option>
+          }
         </select>
       </div>
     </div>
 
     <div class="field">
-      <label class="field-label">Imagen de portada</label>
-      <div style="border:2px dashed var(--border);border-radius:var(--r-sm);padding:28px;text-align:center;background:var(--bg-soft);cursor:pointer">
-        <div style="font-size:24px;margin-bottom:6px">🖼️</div>
-        <div style="font-size:13px;color:var(--text-soft)">Haz clic para subir una imagen</div>
-      </div>
+      <label class="field-label">Imagen de portada (URL)</label>
+      <input type="url" name="imagen_portada" class="field-input" placeholder="https://..." [(ngModel)]="form.imagen_portada">
+      <div style="font-size:12px;color:var(--text-soft);margin-top:6px">De momento se admite una imagen por URL. La subida de archivos estará disponible próximamente.</div>
     </div>
 
     <div class="field">
       <label class="field-label">Ubicación desde donde transmitirás</label>
-      <select class="field-select">
+      <select name="ubicacion" class="field-select" [(ngModel)]="form.ubicacion">
+        <option value="">Seleccionar ubicación</option>
         <option>Barranquilla, Atlántico</option>
         <option>Bogotá D.C.</option>
         <option>Medellín, Antioquia</option>
@@ -67,18 +67,18 @@
     </div>
 
     <div class="field">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-soft);border:1px solid var(--border);border-radius:var(--r-sm)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-soft);border:1px solid var(--border);border-radius:var(--r-sm);opacity:.75">
         <div>
-          <div style="font-size:13px;font-weight:600">Permitir preguntas durante el LIVE</div>
-          <div style="font-size:12px;color:var(--text-soft)">Los espectadores podrán enviar preguntas en tiempo real</div>
+          <div style="font-size:13px;font-weight:600">Permitir preguntas durante el LIVE <span style="font-size:11px;color:var(--text-mute);font-weight:700">· Próximamente</span></div>
+          <div style="font-size:12px;color:var(--text-soft)">El chat ya está disponible; las preguntas con respuestas se habilitarán más adelante.</div>
         </div>
-        <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+        <label class="switch"><input type="checkbox" disabled><span class="switch-track"></span></label>
       </div>
     </div>
 
     <div style="display:flex;justify-content:space-between;gap:10px;margin-top:24px;padding-top:20px;border-top:1px solid var(--border-soft)">
       <a routerLink="/dashboard" class="btn btn-ghost">← Atrás</a>
-      <button type="submit" class="btn btn-live">🔴 Salir al aire</button>
+      <button type="submit" class="btn btn-live" [disabled]="enviando">{{ enviando ? 'Creando…' : '🔴 Salir al aire' }}</button>
     </div>
   </form>
 </main>
