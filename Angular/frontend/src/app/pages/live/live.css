@@ -321,6 +321,38 @@
   margin-top:4px;
 }
 
+/* ============ ESTADOS (carga / error / vacío) ============ */
+.state-card{
+  max-width:1240px;margin:0 auto;
+  background:var(--bg-elev);border:1px solid var(--border-soft);
+  border-radius:var(--r-md);box-shadow:var(--sh-md);
+  padding:48px 28px;text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+.state-emoji{font-size:40px;line-height:1}
+.state-card h3{font-size:18px;font-weight:700;letter-spacing:-.3px;margin:0}
+.state-card p{font-size:13.5px;color:var(--text-soft);margin:0;max-width:460px}
+.state-card .btn{margin-top:8px}
+
+.chat-note{
+  color:rgba(255,255,255,.6);font-size:12.5px;font-weight:500;
+  text-align:center;padding:18px 10px;line-height:1.5;
+}
+.chat-login{
+  flex:1;text-align:center;text-decoration:none;
+  color:#c7d2fe;font-size:12.5px;font-weight:700;
+  padding:10px 16px;border-radius:100px;
+  background:rgba(99,102,241,.18);
+  border:1px solid rgba(99,102,241,.4);
+}
+.chat-login:hover{background:rgba(99,102,241,.3)}
+.meta-note{color:var(--text-mute)}
+.player-desc{margin-top:12px;font-size:13.5px;color:var(--text-soft);line-height:1.6}
+.recs-empty{
+  grid-column:1/-1;text-align:center;
+  color:var(--text-soft);font-size:13.5px;padding:28px 10px;
+}
+
 /* ============ RESPONSIVE: TABLET (< 960px) ============ */
 @media(max-width:960px){
   .recs-title{font-size:22px}

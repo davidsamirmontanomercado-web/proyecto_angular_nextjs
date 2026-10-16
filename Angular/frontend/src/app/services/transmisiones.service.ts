@@ -1,0 +1,173 @@
+import { Injectable, inject } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable, map } from 'rxjs';
+import { AuthService } from './auth.service';
+
+export interface CategoriaInfo {
+  id: string;
+  nombre: string;
+  slug: string;
+  icono: string | null;
+}
+
+export interface EmpresaInfo {
+  id: string;
+  nombre_empresa: string | null;
+  logo: string | null;
+}
+
+/** Información pública mínima del anfitrión (sin ids internos). */
+export interface AnfitrionPublico {
+  transmision_id: string;
+  nombre_empresa: string | null;
+  logo: string | null;
+  anfitrion_nombre: string | null;
+}
+
+export interface Transmision {
+  id: string;
+  titulo: string | null;
+  descripcion: string | null;
+  estado: string | null;
+  subcategoria: string | null;
+  imagen_portada: string | null;
+  destacada: boolean | null;
+  espectadores_actuales: number | null;
+  espectadores_totales: number | null;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  fecha_creacion: string | null;
+  fecha_actualizacion: string | null;
+  duracion_minutos: number | null;
+  url_stream: string | null;
+  ubicacion: string | null;
+  categoria_id: string | null;
+  empresa_id: string | null;
+  categoria?: CategoriaInfo | null;
+  empresa?: EmpresaInfo | null;
+}
+
+export interface TransmisionesResponse {
+  data: Transmision[];
+  meta?: {
+    count?: number;
+  };
+}
+
+export interface TransmisionesQuery {
+  categoria_id?: string;
+  subcategoria?: string;
+  titulo?: string;
+  empresa_id?: string;
+  estado?: string;
+  destacada?: boolean;
+  limit?: number;
+}
+
+/** Línea de negocio (slug almacenado en la BD). */
+export type LineaNegocio = 'ventas' | 'produccion' | 'usados';
+
+/** Campos aceptados al crear. `id`, `anfitrion_id`, `estado`, `empresa_id` y
+ *  `fecha_inicio` los fija el backend (fecha_inicio se establece al iniciar). */
+export interface CrearTransmisionPayload {
+  titulo: string;
+  linea_negocio: LineaNegocio;
+  categoria_id: string;
+  descripcion?: string | null;
+  subcategoria?: string | null;
+  imagen_portada?: string | null;
+  ubicacion?: string | null;
+  destacada?: boolean | null;
+}
+
+/** Campos editables. `estado` no se edita aquí: usa iniciar()/finalizar(). */
+export type ActualizarTransmisionPayload = Partial<CrearTransmisionPayload>;
+
+export interface TransmisionEstadoResponse {
+  data: { id: string; estado: string; duracion_minutos?: number | null };
+}
+
+@Injectable({ providedIn: 'root' })
+export class TransmisionesService {
+  private http = inject(HttpClient);
+  private auth = inject(AuthService);
+
+  private get apiUrl(): string {
+    return `${this.auth.backendUrl}/api/transmisiones`;
+  }
+
+  getTransmisiones(params?: TransmisionesQuery): Observable<TransmisionesResponse> {
+    let httpParams = new HttpParams();
+    if (params?.categoria_id) httpParams = httpParams.set('categoria_id', params.categoria_id);
+    if (params?.subcategoria) httpParams = httpParams.set('subcategoria', params.subcategoria);
+    if (params?.titulo) httpParams = httpParams.set('titulo', params.titulo);
+    if (params?.empresa_id) httpParams = httpParams.set('empresa_id', params.empresa_id);
+    if (params?.estado) httpParams = httpParams.set('estado', params.estado);
+    if (params?.destacada !== undefined) {
+      httpParams = httpParams.set('destacada', String(params.destacada));
+    }
+    if (params?.limit) httpParams = httpParams.set('limit', String(params.limit));
+
+    return this.http.get<TransmisionesResponse>(this.apiUrl, { params: httpParams });
+  }
+
+  getAll(): Observable<Transmision[]> {
+    return this.getTransmisiones().pipe(map((res) => res.data ?? []));
+  }
+
+  getById(id: string): Observable<Transmision> {
+    return this.http
+      .get<{ data: Transmision }>(`${this.apiUrl}/${id}`)
+      .pipe(map((res) => res.data));
+  }
+
+  /** Información pública mínima del anfitrión (nombre comercial, logo). */
+  getAnfitrion(id: string): Observable<AnfitrionPublico | null> {
+    return this.http
+      .get<{ data: AnfitrionPublico | null }>(`${this.apiUrl}/${id}/anfitrion`)
+      .pipe(map((res) => res.data ?? null));
+  }
+
+  /** Transmisiones del usuario autenticado en cualquier estado (incl. 'programada').
+   *  Requiere Authorization Bearer (lo añade authInterceptor). */
+  getMias(estado?: string): Observable<Transmision[]> {
+    let httpParams = new HttpParams();
+    if (estado) httpParams = httpParams.set('estado', estado);
+
+    return this.http
+      .get<TransmisionesResponse>(`${this.apiUrl}/mias`, { params: httpParams })
+      .pipe(map((res) => res.data ?? []));
+  }
+
+  /** Crea una transmisión programada del usuario autenticado. */
+  crear(payload: CrearTransmisionPayload): Observable<{ id: string; estado: string }> {
+    return this.http
+      .post<TransmisionEstadoResponse>(this.apiUrl, payload)
+      .pipe(map((res) => ({ id: res.data.id, estado: res.data.estado })));
+  }
+
+  /** Actualiza los campos editables de una transmisión. */
+  actualizar(
+    id: string,
+    cambios: ActualizarTransmisionPayload
+  ): Observable<{ id: string }> {
+    return this.http.patch<{ data: { id: string } }>(
+      `${this.apiUrl}/${id}`,
+      cambios
+    ).pipe(map((res) => ({ id: res.data.id })));
+  }
+
+  /** programada -> en_vivo */
+  iniciar(id: string): Observable<{ id: string; estado: string }> {
+    return this.http
+      .post<TransmisionEstadoResponse>(`${this.apiUrl}/${id}/iniciar`, {})
+      .pipe(map((res) => ({ id: res.data.id, estado: res.data.estado })));
+  }
+
+  /** en_vivo -> finalizada */
+  finalizar(id: string): Observable<{ id: string; estado: string }> {
+    return this.http
+      .post<TransmisionEstadoResponse>(`${this.apiUrl}/${id}/finalizar`, {})
+      .pipe(map((res) => ({ id: res.data.id, estado: res.data.estado })));
+  }
+}

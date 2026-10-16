@@ -7,30 +7,51 @@
     <p class="section-sub">Cada en vivo aparece según el contenido que consumes.</p>
   </div>
 
-  <div class="tabs" style="display:flex;justify-content:center;margin:0 auto 40px">
+  <div class="tabs" style="display:flex;flex-wrap:wrap;justify-content:center;margin:0 auto 40px">
     @for (f of filtros; track f) {
       <button class="tab" [class.active]="filtro === f" (click)="filtro = f">{{ f }}</button>
     }
   </div>
 
-  <div class="grid-3">
-    @for (l of lives; track l.titulo) {
-      <a routerLink="/live" class="live-card">
-        <div class="live-thumb">
-          <div class="live-badge">EN VIVO</div>
-          <div class="live-viewers">👁 {{ l.viewers }}</div>
-        </div>
-        <div class="live-body">
-          <div class="live-cat">{{ l.cat }}</div>
-          <div class="live-title">{{ l.titulo }}</div>
-          <div class="live-desc">{{ l.desc }}</div>
-          <div class="live-tags">
-            @for (t of l.tags; track t) { <span class="tag-chip">{{ t }}</span> }
+  @if (loading) {
+    <div style="text-align: center; padding: 40px; color: var(--text-soft);">
+      Cargando transmisiones...
+    </div>
+  }
+
+  @if (error) {
+    <div style="text-align: center; padding: 40px; color: #ff3b30;">
+      {{ error }}
+    </div>
+  }
+
+  @if (!loading && !error && filteredLives.length === 0) {
+    <div style="text-align: center; padding: 40px; color: var(--text-soft);">
+      No hay transmisiones disponibles para mostrar.
+    </div>
+  }
+
+  @if (!loading && !error && filteredLives.length > 0) {
+    <div class="grid-3">
+      @for (l of filteredLives; track l.raw.id) {
+        <a [routerLink]="['/live', l.raw.id]" class="live-card">
+          <div class="live-thumb">
+            @if (l.imagen) { <img class="live-cover" [src]="l.imagen" alt="" loading="lazy" /> }
+            <div class="live-badge">EN VIVO</div>
+            <div class="live-viewers">👁 {{ l.viewers }}</div>
           </div>
-        </div>
-      </a>
-    }
-  </div>
+          <div class="live-body">
+            <div class="live-cat">{{ l.cat }}</div>
+            <div class="live-title">{{ l.titulo }}</div>
+            <div class="live-desc">{{ l.desc }}</div>
+            <div class="live-tags">
+              @for (t of l.tags; track t) { <span class="tag-chip">{{ t }}</span> }
+            </div>
+          </div>
+        </a>
+      }
+    </div>
+  }
 </main>
 
 <app-footer></app-footer>

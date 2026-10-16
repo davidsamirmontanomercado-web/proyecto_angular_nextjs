@@ -1,24 +1,101 @@
-import { Component } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { CommonModule } from '@angular/common';
 import { NavbarComponent } from '../../shared/navbar/navbar';
 import { FooterComponent } from '../../shared/footer/footer';
+import { TransmisionesService, Transmision } from '../../services/transmisiones.service';
+
+interface LiveCard {
+  cat: string;
+  categoriaNombre: string;
+  titulo: string;
+  desc: string;
+  viewers: string;
+  imagen: string | null;
+  tags: string[];
+  raw: Transmision;
+}
 
 @Component({
   selector: 'app-envivos',
-  imports: [RouterLink, NavbarComponent, FooterComponent],
+  imports: [RouterLink, NavbarComponent, FooterComponent, CommonModule],
   templateUrl: './envivos.html',
   styleUrl: './envivos.css'
 })
-export class EnvivosComponent {
-  filtro = 'Todos';
-  filtros = ['Todos', 'Ventas · Nuevos', 'Producción', 'Usados'];
+export class EnvivosComponent implements OnInit {
+  private transmisionesService = inject(TransmisionesService);
 
-  lives = [
-    { cat: 'Ventas · Productos nuevos', titulo: 'Lanzamiento colección muebles 2025', desc: 'Muestra en vivo de la nueva línea de muebles de oficina y hogar.', viewers: '1.2K', tags: ['Ver catálogo','Productos'] },
-    { cat: 'Producción · Fábrica', titulo: 'Proceso de fabricación de tornos CNC', desc: 'Recorrido por la planta de producción y maquinaria industrial.', viewers: '856', tags: ['Ver catálogo','Servicios'] },
-    { cat: 'Usados · Equipos', titulo: 'Remate de maquinaria usada certificada', desc: 'Equipos industriales usados con garantía y revisión técnica.', viewers: '2.4K', tags: ['Ver catálogo','Filtros'] },
-    { cat: 'Ventas · Tecnología', titulo: 'Nuevos equipos de cómputo empresarial', desc: 'Portátiles, workstations y servidores para empresas.', viewers: '640', tags: ['Ver catálogo','Productos'] },
-    { cat: 'Producción · Alimentos', titulo: 'Línea de empaque automatizada', desc: 'Conoce la maquinaria de empaque y sellado industrial.', viewers: '1.8K', tags: ['Ver catálogo','Servicios'] },
-    { cat: 'Usados · Oficina', titulo: 'Liquidación de mobiliario de oficina', desc: 'Escritorios, sillas y archivadores usados en excelente estado.', viewers: '420', tags: ['Ver catálogo','Filtros'] }
-  ];
+  readonly FILTRO_TODOS = 'Todos';
+  filtro = this.FILTRO_TODOS;
+  filtros: string[] = [this.FILTRO_TODOS];
+
+  lives: LiveCard[] = [];
+  loading = false;
+  error: string | null = null;
+
+  ngOnInit(): void {
+    this.cargarTransmisiones();
+  }
+
+  private buildCategoriaLabel(t: Transmision): string {
+    const nombre = t.categoria?.nombre?.trim() ?? '';
+    const sub = t.subcategoria?.trim() ?? '';
+    if (nombre && sub) return `${nombre} · ${sub}`;
+    return nombre || sub;
+  }
+
+  private mapTransmision(t: Transmision): LiveCard {
+    const categoriaNombre = t.categoria?.nombre?.trim() ?? '';
+    const viewers = t.espectadores_actuales ?? t.espectadores_totales ?? 0;
+    const tags = ['Ver catálogo'];
+    if (categoriaNombre) tags.push(categoriaNombre);
+    if (t.subcategoria && t.subcategoria !== categoriaNombre) tags.push(t.subcategoria);
+    return {
+      cat: this.buildCategoriaLabel(t),
+      categoriaNombre,
+      titulo: t.titulo?.trim() || 'Sin título',
+      desc: t.descripcion?.trim() || '',
+      viewers: typeof viewers === 'number' ? viewers.toLocaleString() : String(viewers),
+      imagen: t.imagen_portada || null,
+      tags: Array.from(new Set(tags)),
+      raw: t
+    };
+  }
+
+  private buildFiltros(cards: LiveCard[]): void {
+    const nombres = Array.from(
+      new Set(cards.map((c) => c.categoriaNombre).filter((n): n is string => !!n))
+    );
+    nombres.sort((a, b) => a.localeCompare(b, 'es'));
+    this.filtros = [this.FILTRO_TODOS, ...nombres];
+    if (!this.filtros.includes(this.filtro)) {
+      this.filtro = this.FILTRO_TODOS;
+    }
+  }
+
+  cargarTransmisiones(): void {
+    this.loading = true;
+    this.error = null;
+    this.transmisionesService.getAll().subscribe({
+      next: (data) => {
+        this.lives = data.map((t) => this.mapTransmision(t));
+        this.buildFiltros(this.lives);
+        this.loading = false;
+      },
+      error: (err) => {
+        console.error('Error al cargar transmisiones:', err);
+        this.error = 'No se pudieron cargar las transmisiones. Inténtalo más tarde.';
+        this.lives = [];
+        this.filtros = [this.FILTRO_TODOS];
+        this.loading = false;
+      }
+    });
+  }
+
+  get filteredLives(): LiveCard[] {
+    if (this.filtro === this.FILTRO_TODOS) {
+      return this.lives;
+    }
+    return this.lives.filter((l) => l.categoriaNombre === this.filtro);
+  }
 }
