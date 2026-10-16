@@ -14,7 +14,7 @@ const ESTADO_PROGRAMADA = 'programada';
 
 // Valores permitidos de public.transmisiones.linea_negocio (NOT NULL, sin default).
 // La base de datos guarda el slug; el formulario muestra la etiqueta legible.
-const LINEAS_NEGOCIO = ['ventas', 'produccion', 'usados'] as const;
+const LINEAS_NEGOCIO = ['ventas_nuevos', 'produccion', 'usados'] as const;
 type LineaNegocio = (typeof LINEAS_NEGOCIO)[number];
 
 // Título y longitudes máximas aceptadas al crear/editar.
