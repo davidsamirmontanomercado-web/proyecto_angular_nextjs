@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabase } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
+import { getSupabaseEnv } from '@/lib/supabase/server';
 
 function getAllowedOrigins(): string[] {
   const origins = ['http://localhost:4200'];
@@ -31,6 +32,16 @@ function getCorsHeaders(request: Request): Record<string, string> {
   return headers;
 }
 
+// Cliente ANON sin cookies: esta ruta no depende de la sesión ni de datos del
+// usuario, de modo que la respuesta es idéntica para cualquier llamador y el
+// 200 puede cachearse como `public` de forma segura. RLS sigue activa (rol anon).
+function createAnonSupabase() {
+  const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+  });
+}
+
 // Proyección pública: columnas reales de public.categorias (verificadas).
 const CATEGORIA_SELECT = [
   'id',
@@ -52,7 +63,7 @@ export async function OPTIONS(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createServerSupabase();
+    const supabase = createAnonSupabase();
     const { searchParams } = new URL(request.url);
     const incluirInactivas = searchParams.get('incluir_inactivas') === 'true';
     const limitParam = searchParams.get('limit');
@@ -78,9 +89,18 @@ export async function GET(request: Request) {
     }
 
     const categorias = data ?? [];
+    // La proyección es exclusivamente pública (columnas públicas de
+    // `categorias`, sin ids de usuario ni datos personales), así que el 200 es
+    // cacheable en CDN/navegador. Los errores NO se cachean.
     return NextResponse.json(
       { data: categorias, meta: { count: categorias.length } },
-      { status: 200, headers: getCorsHeaders(request) }
+      {
+        status: 200,
+        headers: {
+          ...getCorsHeaders(request),
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600'
+        }
+      }
     );
   } catch (err) {
     console.error('Unexpected error fetching categorias:', err);

@@ -18,6 +18,9 @@ export class AuthService {
   private readonly KEY_USERS = 'lm_users';
   private readonly KEY_TOKEN = 'lm_token';
   private readonly KEY_REFRESH = 'lm_refresh';
+  // Backend contra el que se creó la sesión actual: si cambia, se invalida la
+  // sesión para no reutilizar un token de otro proyecto Supabase.
+  private readonly KEY_BACKEND = 'lm_session_backend';
   private router = inject(Router);
 
   // Generación de sesión: se incrementa al cerrar/limpiar, de modo que un
@@ -25,29 +28,62 @@ export class AuthService {
   private sessionGeneration = 0;
   private refreshInFlight: Promise<boolean> | null = null;
 
-private static resolveBackendUrl(): string {
-  try {
-    const override = localStorage.getItem('lm_backend_url');
-
-    if (override) {
-      return override.replace(/\/+$/, '');
+  private static esUrlLocal(url: string): boolean {
+    try {
+      const host = new URL(url).hostname;
+      return host === 'localhost' || host === '127.0.0.1' || host === '';
+    } catch {
+      return false;
     }
+  }
 
-    const host = window.location.hostname;
+  /**
+   * Resuelve la URL del backend.
+   * - En desarrollo local (localhost/127.0.0.1) se IGNORA un override remoto
+   *   (p. ej. producción): un residuo en `lm_backend_url` no debe apuntar el
+   *   frontend local a otro backend.
+   * - En producción se mantiene el comportamiento de siempre: si hay override
+   *   se usa; si no, la URL de producción.
+   */
+  private static resolveBackendUrl(): string {
+    try {
+      const host = window.location.hostname;
+      const esLocal = host === 'localhost' || host === '127.0.0.1' || host === '';
 
-    // Desarrollo local
-    if (host === 'localhost' || host === '127.0.0.1' || host === '') {
+      const override = localStorage.getItem('lm_backend_url');
+      const overrideLimpio = override ? override.replace(/\/+$/, '') : null;
+
+      if (overrideLimpio) {
+        const overrideEsLocal = AuthService.esUrlLocal(overrideLimpio);
+        if (!(esLocal && !overrideEsLocal)) {
+          return overrideLimpio;
+        }
+      }
+
+      return esLocal ? 'http://localhost:3000' : 'https://backend-one-liard-61.vercel.app';
+    } catch {
       return 'http://localhost:3000';
     }
-
-    // Producción
-    return 'https://backend-one-liard-61.vercel.app';
-  } catch {
-    return 'http://localhost:3000';
   }
-}
 
   readonly backendUrl = AuthService.resolveBackendUrl();
+
+  constructor() {
+    // Una sesión creada contra otro backend no se reutiliza (evita 401 por
+    // tokens de un proyecto Supabase distinto).
+    this.protegerSesionDeBackend();
+  }
+
+  private protegerSesionDeBackend() {
+    try {
+      const backendDeLaSesion = localStorage.getItem(this.KEY_BACKEND);
+      if (backendDeLaSesion && backendDeLaSesion !== this.backendUrl) {
+        this.clearSession();
+      }
+    } catch {
+      // almacenamiento no disponible: no hay sesión que proteger.
+    }
+  }
 
   // URL de inicio de login con Google. Se envía el origen actual del navegador
   // para que el backend pueda validarlo contra su allowlist y volver a él tras
@@ -81,6 +117,7 @@ private static resolveBackendUrl(): string {
 
   setSession(user: User, token?: string, refreshToken?: string) {
     localStorage.setItem(this.KEY_USER, JSON.stringify(user));
+    localStorage.setItem(this.KEY_BACKEND, this.backendUrl);
     if (token) {
       localStorage.setItem(this.KEY_TOKEN, token);
       this.tokenSignal.set(token);
@@ -99,8 +136,32 @@ private static resolveBackendUrl(): string {
     localStorage.removeItem(this.KEY_USER);
     localStorage.removeItem(this.KEY_TOKEN);
     localStorage.removeItem(this.KEY_REFRESH);
+    localStorage.removeItem(this.KEY_BACKEND);
     this.currentUser.set(null);
     this.tokenSignal.set(null);
+  }
+
+  /**
+   * Elimina el override manual `lm_backend_url`.
+   *
+   * Comportamiento:
+   *  - Borra el override del almacenamiento. No recarga la página: `backendUrl`
+   *    es de sólo lectura y se resuelve una vez; en el próximo arranque vuelve a
+   *    autodetectarse (local vs producción).
+   *  - Si el backend de la sesión activa deja de coincidir con el recalculado,
+   *    cierra la sesión para no reutilizar un token de otro proyecto Supabase.
+   */
+  resetBackendUrl(): void {
+    try {
+      localStorage.removeItem('lm_backend_url');
+      const backendDeLaSesion = localStorage.getItem(this.KEY_BACKEND);
+      const recalculado = AuthService.resolveBackendUrl();
+      if (backendDeLaSesion && backendDeLaSesion !== recalculado) {
+        this.clearSession();
+      }
+    } catch {
+      // almacenamiento no disponible: no hay nada que limpiar.
+    }
   }
 
   /**

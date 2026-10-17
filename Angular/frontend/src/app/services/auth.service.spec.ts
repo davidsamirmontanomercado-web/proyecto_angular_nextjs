@@ -156,3 +156,102 @@ describe('AuthService', () => {
     expect(localStorage.getItem('lm_token')).toBeNull();
   });
 });
+
+describe('AuthService · backend por entorno', () => {
+  const OVERRIDE_PROD = 'https://backend-one-liard-61.vercel.app';
+
+  const perfil = { nombre: 'Ana', correo: 'ana@a.com', rol: 'empresa' as const };
+
+  /** Crea un AuthService nuevo simulando que la página se sirve desde `hostname`. */
+  function crearServicioComo(hostname: string): AuthService {
+    vi.stubGlobal('location', { hostname, origin: `http://${hostname}` });
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    return TestBed.inject(AuthService);
+  }
+
+  beforeEach(() => localStorage.clear());
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.clear();
+    TestBed.resetTestingModule();
+  });
+
+  it('en localhost IGNORA un override de producción y usa localhost:3000', () => {
+    localStorage.setItem('lm_backend_url', OVERRIDE_PROD);
+
+    const svc = crearServicioComo('localhost');
+
+    expect(svc.backendUrl).toBe('http://localhost:3000');
+  });
+
+  it('en localhost respeta un override local', () => {
+    localStorage.setItem('lm_backend_url', 'http://localhost:5000');
+
+    const svc = crearServicioComo('localhost');
+
+    expect(svc.backendUrl).toBe('http://localhost:5000');
+  });
+
+  it('en producción sin override usa la URL de producción', () => {
+    const svc = crearServicioComo('frontend-three-wine-12.vercel.app');
+
+    expect(svc.backendUrl).toBe(OVERRIDE_PROD);
+  });
+
+  it('en producción respeta un override explícito', () => {
+    localStorage.setItem('lm_backend_url', 'https://mi-backend.example.com');
+
+    const svc = crearServicioComo('frontend-three-wine-12.vercel.app');
+
+    expect(svc.backendUrl).toBe('https://mi-backend.example.com');
+  });
+
+  it('setSession registra el backend activo de la sesión', () => {
+    const svc = crearServicioComo('localhost');
+
+    svc.setSession(perfil, 'token-1');
+
+    expect(localStorage.getItem('lm_session_backend')).toBe('http://localhost:3000');
+  });
+
+  it('descarta la sesión si fue creada contra otro backend', () => {
+    localStorage.setItem('lm_session_backend', 'http://localhost:3000');
+    localStorage.setItem('lm_user', JSON.stringify(perfil));
+    localStorage.setItem('lm_token', 'token-de-localhost');
+    localStorage.setItem('lm_backend_url', OVERRIDE_PROD);
+
+    const svc = crearServicioComo('frontend-three-wine-12.vercel.app');
+
+    expect(svc.isLoggedIn()).toBe(false);
+    expect(localStorage.getItem('lm_token')).toBeNull();
+    expect(localStorage.getItem('lm_session_backend')).toBeNull();
+  });
+
+  it('resetBackendUrl elimina el override manual', () => {
+    localStorage.setItem('lm_backend_url', 'http://localhost:5000');
+
+    const svc = crearServicioComo('localhost');
+    expect(svc.backendUrl).toBe('http://localhost:5000');
+
+    svc.resetBackendUrl();
+
+    expect(localStorage.getItem('lm_backend_url')).toBeNull();
+  });
+
+  it('resetBackendUrl cierra la sesión si el backend efectivo cambia', () => {
+    localStorage.setItem('lm_backend_url', 'https://otro.example.com');
+    localStorage.setItem('lm_session_backend', 'https://otro.example.com');
+    localStorage.setItem('lm_user', JSON.stringify(perfil));
+    localStorage.setItem('lm_token', 'token-otro');
+
+    const svc = crearServicioComo('frontend-three-wine-12.vercel.app');
+    expect(svc.isLoggedIn()).toBe(true);
+
+    svc.resetBackendUrl();
+
+    expect(localStorage.getItem('lm_backend_url')).toBeNull();
+    expect(svc.isLoggedIn()).toBe(false);
+  });
+});
