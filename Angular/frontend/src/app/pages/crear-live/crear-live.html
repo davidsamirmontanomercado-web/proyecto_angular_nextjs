@@ -51,9 +51,48 @@
     </div>
 
     <div class="field">
-      <label class="field-label">Imagen de portada (URL)</label>
-      <input type="url" name="imagen_portada" class="field-input" placeholder="https://..." [(ngModel)]="form.imagen_portada">
-      <div style="font-size:12px;color:var(--text-soft);margin-top:6px">De momento se admite una imagen por URL. La subida de archivos estará disponible próximamente.</div>
+      <label class="field-label">Imagen de portada</label>
+
+      <!-- Input real oculto: se abre con el botón (selector nativo en PC y móvil). -->
+      <input
+        #filePortada
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        class="file-hidden"
+        (change)="onPortadaSeleccionada($event)"
+      >
+
+      @if (portadaPreview()) {
+        <div class="portada-preview">
+          <img [src]="portadaPreview()!" alt="Vista previa de la portada">
+          <div class="portada-preview-info">
+            <span>{{ portadaArchivo()?.name }}</span>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="quitarPortada()">Quitar</button>
+          </div>
+        </div>
+      } @else {
+        <button type="button" class="btn btn-ghost portada-btn" (click)="abrirSelectorPortada()">
+          🖼️ Seleccionar imagen
+        </button>
+      }
+
+      @if (portadaError()) {
+        <div class="field-error" role="alert">{{ portadaError() }}</div>
+      }
+      <div class="field-hint">
+        JPG, PNG, WEBP o GIF · máximo 3 MB. La imagen se sube al almacenamiento y se guarda su URL.
+      </div>
+
+      <details class="portada-alt">
+        <summary>O pega una URL de imagen</summary>
+        <input
+          type="url"
+          name="imagen_portada"
+          class="field-input"
+          placeholder="https://..."
+          [(ngModel)]="form.imagen_portada"
+        >
+      </details>
     </div>
 
     <div class="field">
@@ -78,7 +117,9 @@
 
     <div style="display:flex;justify-content:space-between;gap:10px;margin-top:24px;padding-top:20px;border-top:1px solid var(--border-soft)">
       <a routerLink="/dashboard" class="btn btn-ghost">← Atrás</a>
-      <button type="submit" class="btn btn-live" [disabled]="enviando">{{ enviando ? 'Creando…' : '🔴 Salir al aire' }}</button>
+      <button type="submit" class="btn btn-live" [disabled]="enviando">
+        {{ subiendoPortada() ? 'Subiendo portada…' : (enviando ? 'Creando…' : '🔴 Salir al aire') }}
+      </button>
     </div>
   </form>
 </main>

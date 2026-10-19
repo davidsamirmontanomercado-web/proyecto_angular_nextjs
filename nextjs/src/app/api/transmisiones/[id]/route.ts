@@ -6,9 +6,17 @@ import {
   UUID_RE
 } from '@/lib/api/http';
 import { createServerSupabase } from '@/lib/supabase/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-// Regla de negocio confirmada: sólo se consulta públicamente en vivo.
-const ESTADO_EN_VIVO = 'en_vivo';
+// El DETALLE debe servirle también al ANFITRIÓN antes de iniciar (estado
+// 'programada'), para que pueda preparar y arrancar su emisión. El filtro por
+// estado lo aplica la RLS: el público sólo ve filas `en_vivo`; el propietario ve
+// las suyas en cualquier estado (política `transmisiones_lectura_propietario`).
+
+// Vistas agregadas (security_invoker = false). Ver
+// supabase/migrations/20261017130000_reacciones_presencia.sql
+const VISTA_CONTEO = 'transmisiones_espectadores_publico';
+const VISTA_REACCIONES = 'transmisiones_reacciones_publico';
 
 const MAX = {
   titulo: 200,
@@ -36,8 +44,61 @@ const TRANSMISION_SELECT = [
 
 const CORS = cors('GET, PATCH, OPTIONS');
 
+type FilaTransmision = Record<string, unknown> & {
+  espectadores_actuales?: number | null;
+  espectadores_totales?: number | null;
+};
+
 export function OPTIONS(request: Request) {
   return CORS.empty(request);
+}
+
+// Lee el conteo agregado de espectadores. Si la vista no existe todavía
+// (migración pendiente), devuelve null y se conservan los valores de la tabla.
+async function leerEspectadores(db: SupabaseClient, id: string) {
+  try {
+    const { data, error } = await db
+      .schema('public')
+      .from(VISTA_CONTEO)
+      .select('actuales,totales')
+      .eq('transmision_id', id)
+      .maybeSingle();
+
+    if (error) return null;
+    if (!data) return { actuales: 0, totales: 0 };
+    return {
+      actuales: typeof data.actuales === 'number' ? data.actuales : 0,
+      totales: typeof data.totales === 'number' ? data.totales : 0
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Lee el resumen agregado de reacciones. `autores` sólo está concedido a
+// `authenticated`: para una petición sin sesión se pide únicamente `total`
+// (si se pidiera `autores`, Postgres devolvería 42501 y se perdería también el
+// contador, que sí es público).
+async function leerReacciones(db: SupabaseClient, id: string, conAutores: boolean) {
+  try {
+    const base = db.schema('public').from(VISTA_REACCIONES);
+
+    const { data, error } = conAutores
+      ? await base.select('total,autores').eq('transmision_id', id).maybeSingle()
+      : await base.select('total').eq('transmision_id', id).maybeSingle();
+
+    if (error) return null;
+    if (!data) return { total: 0, autores: [] as string[] };
+
+    const fila = data as unknown as { total?: unknown; autores?: unknown };
+    return {
+      total: typeof fila.total === 'number' ? fila.total : 0,
+      autores:
+        conAutores && Array.isArray(fila.autores) ? (fila.autores as string[]) : []
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(
@@ -51,14 +112,18 @@ export async function GET(
       return CORS.json(request, { error: 'Identificador de transmisión no válido' }, 400);
     }
 
-    const supabase = await createServerSupabase();
+    // Con Bearer válido se usa el cliente del usuario: así la RLS permite al
+    // ANFITRIÓN leer SU transmisión en cualquier estado ('programada' incluida).
+    // Sin token (o token inválido) se cae al cliente público, que sólo ve las
+    // transmisiones en vivo.
+    const auth = await requireUser(request);
+    const db: SupabaseClient = auth.ok ? auth.db : await createServerSupabase();
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .schema('public')
       .from('transmisiones')
       .select(TRANSMISION_SELECT)
       .eq('id', id)
-      .eq('estado', ESTADO_EN_VIVO)
       .maybeSingle();
 
     if (error) {
@@ -66,11 +131,40 @@ export async function GET(
       return CORS.json(request, { error: 'Error interno del servidor' }, 500);
     }
 
-    if (!data) {
-      return CORS.json(request, { error: 'Transmisión no encontrada o no está en vivo' }, 404);
+    const fila = data as unknown as FilaTransmision | null;
+
+    if (!fila) {
+      return CORS.json(
+        request,
+        { error: 'Transmisión no encontrada, no está en vivo o no es tuya' },
+        404
+      );
     }
 
-    return CORS.json(request, { data }, 200);
+    // Contadores reales (vistas agregadas). Si aún no existen, no se rompe.
+    // `auth.ok` decide si se piden los nombres de quienes reaccionaron.
+    const [espectadores, reacciones] = await Promise.all([
+      leerEspectadores(db, id),
+      leerReacciones(db, id, auth.ok)
+    ]);
+
+    return CORS.json(
+      request,
+      {
+        data: {
+          ...fila,
+          espectadores_actuales: espectadores
+            ? espectadores.actuales
+            : fila.espectadores_actuales,
+          espectadores_totales: espectadores
+            ? espectadores.totales
+            : fila.espectadores_totales,
+          reacciones_total: reacciones ? reacciones.total : 0,
+          reacciones_autores: reacciones ? reacciones.autores : []
+        }
+      },
+      200
+    );
   } catch (err) {
     console.error('Unexpected error fetching transmision:', err);
     return CORS.json(request, { error: 'Error interno del servidor' }, 500);

@@ -1,6 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { Router, CanActivateFn } from '@angular/router';
 import { inject } from '@angular/core';
+import { ToastService } from './toast.service';
 
 export interface User {
   id?: string;
@@ -22,6 +23,7 @@ export class AuthService {
   // sesión para no reutilizar un token de otro proyecto Supabase.
   private readonly KEY_BACKEND = 'lm_session_backend';
   private router = inject(Router);
+  private toast = inject(ToastService);
 
   // Generación de sesión: se incrementa al cerrar/limpiar, de modo que un
   // refresco en curso no pueda restaurar una sesión ya cerrada.
@@ -32,6 +34,32 @@ export class AuthService {
     try {
       const host = new URL(url).hostname;
       return host === 'localhost' || host === '127.0.0.1' || host === '';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * ¿El JWT sigue vigente según su `exp`?
+   *
+   * Sólo se decodifica el payload (base64url) sin verificar la firma: es una
+   * comprobación local para no lanzar peticiones que el backend rechazará con
+   * 401. La validación real la sigue haciendo el backend con GoTrue.
+   *
+   * Un token sin payload, sin `exp` numérico o malformado NO se considera
+   * vigente: nunca es prueba de que la sesión sirva. En ese caso la sesión sólo
+   * se da por utilizable si hay un refresh_token con el que renovarla
+   * (ver `sesionUtilizable`).
+   */
+  private static tokenVigente(token: string): boolean {
+    const payload = token.split('.')[1];
+    if (!payload) return false;
+    try {
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const relleno = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      const datos = JSON.parse(atob(relleno));
+      const exp = typeof datos?.exp === 'number' ? datos.exp : null;
+      return exp === null ? false : exp * 1000 > Date.now();
     } catch {
       return false;
     }
@@ -101,6 +129,32 @@ export class AuthService {
     () => this.currentUser() !== null && this.tokenSignal() !== null
   );
 
+  /**
+   * ¿Existe una sesión con la que el backend pueda reconocer al usuario?
+   *
+   * - Con access_token vigente: sí.
+   * - Con access_token ausente o caducado: sólo si hay refresh_token, porque el
+   *   interceptor ya sabe renovarlo con el mecanismo existente.
+   *
+   * Sirve para decidir si tiene sentido pedir datos "por usuario" (me gusta,
+   * seguimiento, chat, presencia) y así no generar 401 en la consola. No altera
+   * `isLoggedIn` ni los guards de ruta.
+   */
+  readonly sesionUtilizable = computed(() => {
+    if (!this.currentUser()) return false;
+    const token = this.tokenSignal();
+    if (token && AuthService.tokenVigente(token)) return true;
+    return this.hayRefreshToken();
+  });
+
+  private hayRefreshToken(): boolean {
+    try {
+      return !!localStorage.getItem(this.KEY_REFRESH);
+    } catch {
+      return false;
+    }
+  }
+
   private loadUser(): User | null {
     try { return JSON.parse(localStorage.getItem(this.KEY_USER) || 'null'); }
     catch { return null; }
@@ -165,16 +219,38 @@ export class AuthService {
   }
 
   /**
+   * Da la sesión por perdida: limpia las credenciales que el backend ya rechaza
+   * y avisa una única vez (esto sólo se llama desde el refresco single-flight).
+   * El interceptor se encarga de llevar al usuario al inicio de sesión.
+   */
+  private expirarSesion(): void {
+    this.clearSession();
+    this.toast.err('Tu sesión ha caducado. Inicia sesión de nuevo para continuar.');
+  }
+
+  /**
    * Renueva el access_token usando el refresh_token guardado.
-   * Single-flight: las llamadas concurrentes comparten la misma promesa.
+   * Single-flight: las llamadas concurrentes comparten la misma promesa, así que
+   * varios 401 simultáneos provocan una sola petición de renovación.
    * Si el usuario cierra sesión durante la renovación (cambia la generación),
    * no se restaura la sesión.
+   *
+   * Devuelve `false` cuando no se pudo renovar. Limpia las credenciales (sesión
+   * irrecuperable) sólo cuando el refresh_token falta o el backend lo rechaza
+   * (400/401); ante errores del servidor o de red mantiene la sesión, porque
+   * pueden ser transitorios y no prueban que la sesión haya caducado.
    */
   async refresh(): Promise<boolean> {
     if (this.refreshInFlight) return this.refreshInFlight;
 
     const rt = localStorage.getItem(this.KEY_REFRESH);
-    if (!rt) return false;
+    if (!rt) {
+      // Sin refresh_token no hay forma de recuperar el access_token caducado:
+      // se limpian las credenciales para no dejar al usuario "logueado" con un
+      // token que el backend rechaza.
+      this.expirarSesion();
+      return false;
+    }
 
     const gen = this.sessionGeneration;
     this.refreshInFlight = (async () => {
@@ -189,7 +265,8 @@ export class AuthService {
         });
 
         if (!res.ok) {
-          if (gen === this.sessionGeneration) this.clearSession();
+          const rechazado = res.status === 400 || res.status === 401;
+          if (rechazado && gen === this.sessionGeneration) this.expirarSesion();
           return false;
         }
 
@@ -197,7 +274,7 @@ export class AuthService {
         const session = body?.session;
 
         if (!session?.access_token || gen !== this.sessionGeneration) {
-          if (gen === this.sessionGeneration) this.clearSession();
+          if (gen === this.sessionGeneration) this.expirarSesion();
           return false;
         }
 
@@ -208,6 +285,7 @@ export class AuthService {
         this.tokenSignal.set(session.access_token);
         return true;
       } catch {
+        // Fallo de red: la sesión no se toca, puede reintentarse.
         return false;
       } finally {
         this.refreshInFlight = null;

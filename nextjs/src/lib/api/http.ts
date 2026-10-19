@@ -59,11 +59,15 @@ export type AuthResult =
 // Cliente de datos ligado al access_token del usuario.
 // Con `accessToken` supabase-js envía Authorization: Bearer <token> a PostgREST,
 // de modo que RLS ve auth.uid() real y NO se usa service_role.
+// La cabecera `global.headers.Authorization` es redundante para PostgREST pero
+// garantiza que Storage (que no siempre hereda `accessToken`) también reciba el
+// token del usuario y aplique las políticas de `storage.objects`.
 function crearClienteDeUsuario(token: string): SupabaseClient {
   const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
 
   return createClient(supabaseUrl, supabaseAnonKey, {
-    accessToken: async () => token
+    accessToken: async () => token,
+    global: { headers: { Authorization: `Bearer ${token}` } }
   });
 }
 

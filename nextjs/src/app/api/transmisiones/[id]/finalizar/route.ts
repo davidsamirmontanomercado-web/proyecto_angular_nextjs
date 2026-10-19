@@ -1,4 +1,5 @@
 import { cors, mapErrorBD, requireUser, UUID_RE } from '@/lib/api/http';
+import { eliminarSala, leerConfigLiveKit } from '@/lib/livekit/server';
 
 // Transición verificada: en_vivo -> finalizada.
 const ESTADO_EN_VIVO = 'en_vivo';
@@ -98,6 +99,19 @@ export async function POST(
         { error: 'No se pudo finalizar: el estado cambió o la transmisión ya no está en vivo.' },
         409
       );
+    }
+
+    // La transmisión ya quedó confirmada como `finalizada` en la base de datos:
+    // sólo ahora es seguro expulsar a los participantes de la sala de LiveKit.
+    // Si LiveKit no está configurado o la sala ya no existe, el cierre de la
+    // transmisión no debe fallar por ello.
+    const config = leerConfigLiveKit();
+    if (config) {
+      try {
+        await eliminarSala(config, id);
+      } catch (err) {
+        console.warn('No se pudo eliminar la sala de LiveKit al finalizar:', err);
+      }
     }
 
     return CORS.json(

@@ -1,4 +1,5 @@
 import { cors, mapErrorBD, requireUser } from '@/lib/api/http';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // GET /api/transmisiones/mias -> lista TODAS las transmisiones del usuario
 // autenticado, en cualquier estado (incluidas las 'programada'), para que pueda
@@ -38,6 +39,48 @@ const MIS_TRANSMISIONES_SELECT = [
 
 const CORS = cors('GET, OPTIONS');
 
+// Vista agregada de presencia (security_invoker = false) con los contadores
+// REALES: las columnas `espectadores_actuales`/`espectadores_totales` de la
+// tabla son heredadas y no las actualiza nadie. Ver la migración
+// supabase/migrations/20261017130000_reacciones_presencia.sql.
+const VISTA_CONTEO = 'transmisiones_espectadores_publico';
+
+type FilaTransmision = { id: string; espectadores_actuales?: number | null; espectadores_totales?: number | null };
+
+// Sustituye los contadores heredados por los de la vista de presencia.
+// Si la vista aún no existe (migración pendiente), devuelve las filas intactas.
+async function conConteoDeEspectadores(
+  supabase: SupabaseClient,
+  filas: FilaTransmision[]
+): Promise<FilaTransmision[]> {
+  if (filas.length === 0) return filas;
+
+  try {
+    const { data: conteos, error } = await supabase
+      .schema('public')
+      .from(VISTA_CONTEO)
+      .select('transmision_id,actuales,totales')
+      .in(
+        'transmision_id',
+        filas.map((f) => f.id)
+      );
+
+    if (error || !conteos) return filas;
+
+    const mapa = new Map<string, { actuales: number; totales: number }>();
+    for (const c of conteos as Array<{ transmision_id: string; actuales: number; totales: number }>) {
+      mapa.set(c.transmision_id, { actuales: c.actuales ?? 0, totales: c.totales ?? 0 });
+    }
+
+    return filas.map((f) => {
+      const c = mapa.get(f.id);
+      return c ? { ...f, espectadores_actuales: c.actuales, espectadores_totales: c.totales } : f;
+    });
+  } catch {
+    return filas;
+  }
+}
+
 export function OPTIONS(request: Request) {
   return CORS.empty(request);
 }
@@ -75,7 +118,10 @@ export async function GET(request: Request) {
       return CORS.json(request, { error: mapped!.mensaje }, mapped!.status);
     }
 
-    const transmisiones = data ?? [];
+    const transmisiones = await conConteoDeEspectadores(
+      auth.db,
+      (data ?? []) as unknown as FilaTransmision[]
+    );
     return CORS.json(
       request,
       { data: transmisiones, meta: { count: transmisiones.length } },

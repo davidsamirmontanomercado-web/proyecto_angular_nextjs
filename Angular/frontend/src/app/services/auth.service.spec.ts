@@ -155,6 +155,45 @@ describe('AuthService', () => {
     expect(service.isLoggedIn()).toBe(false);
     expect(localStorage.getItem('lm_token')).toBeNull();
   });
+
+  it('refresh sin refresh_token limpia las credenciales inservibles', async () => {
+    service.setSession(perfil, 'viejo');
+
+    const ok = await service.refresh();
+
+    expect(ok).toBe(false);
+    expect(service.isLoggedIn()).toBe(false);
+    expect(localStorage.getItem('lm_token')).toBeNull();
+    expect(localStorage.getItem('lm_user')).toBeNull();
+  });
+
+  it('refresh no cierra la sesión ante un error transitorio del servidor', async () => {
+    service.setSession(perfil, 'viejo', 'refresh-1');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) })
+    );
+
+    const ok = await service.refresh();
+
+    expect(ok).toBe(false);
+    expect(service.isLoggedIn()).toBe(true);
+    expect(localStorage.getItem('lm_token')).toBe('viejo');
+  });
+
+  it('sesionUtilizable usa el exp del token y no da por válido lo ilegible', () => {
+    const jwtConExp = (exp: number) => `cabecera.${btoa(JSON.stringify({ exp }))}.firma`;
+    const ahora = Math.floor(Date.now() / 1000);
+
+    service.setSession(perfil, jwtConExp(ahora + 3600));
+    expect(service.sesionUtilizable()).toBe(true);
+
+    service.setSession(perfil, jwtConExp(ahora - 10));
+    expect(service.sesionUtilizable()).toBe(false);
+
+    service.setSession(perfil, 'no-es-un-jwt');
+    expect(service.sesionUtilizable()).toBe(false);
+  });
 });
 
 describe('AuthService · backend por entorno', () => {

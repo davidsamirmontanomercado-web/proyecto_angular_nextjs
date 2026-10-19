@@ -45,6 +45,9 @@ export interface Transmision {
   empresa_id: string | null;
   categoria?: CategoriaInfo | null;
   empresa?: EmpresaInfo | null;
+  /** Resumen agregado de reacciones (lo añade el detalle de la API). */
+  reacciones_total?: number | null;
+  reacciones_autores?: string[] | null;
 }
 
 export interface TransmisionesResponse {
@@ -85,6 +88,26 @@ export type ActualizarTransmisionPayload = Partial<CrearTransmisionPayload>;
 
 export interface TransmisionEstadoResponse {
   data: { id: string; estado: string; duracion_minutos?: number | null };
+}
+
+/** Contadores reales de espectadores (vista agregada de presencia). */
+export interface ConteoEspectadores {
+  actuales: number;
+  totales: number;
+}
+
+/** Rol concedido por el backend para la sala de LiveKit (nunca lo propone Angular). */
+export type RolLiveKit = 'anfitrion' | 'espectador';
+
+/** Credenciales de acceso a la sala de LiveKit de una transmisión. */
+export interface TokenLiveKit {
+  /** URL del servidor de medios (LiveKit Cloud). */
+  url: string;
+  /** Token de vida corta firmado por el backend. */
+  token: string;
+  rol: RolLiveKit;
+  /** Sala: el id real de la transmisión. */
+  sala: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -169,5 +192,53 @@ export class TransmisionesService {
     return this.http
       .post<TransmisionEstadoResponse>(`${this.apiUrl}/${id}/finalizar`, {})
       .pipe(map((res) => ({ id: res.data.id, estado: res.data.estado })));
+  }
+
+  /**
+   * Sube la imagen de portada a Supabase Storage (bucket `portadas`) vía API y
+   * devuelve su URL pública. No se guarda Base64 en la tabla.
+   */
+  subirPortada(archivo: File): Observable<string> {
+    const form = new FormData();
+    form.append('archivo', archivo);
+    return this.http
+      .post<{ data: { url: string } }>(`${this.auth.backendUrl}/api/uploads/portada`, form)
+      .pipe(map((res) => res.data.url));
+  }
+
+  // --- LiveKit (audio y video en tiempo real) ------------------------------
+
+  /**
+   * Pide al backend el token de acceso a la sala de LiveKit de la transmisión.
+   * El rol (anfitrión/espectador) lo decide el servidor comparando la sesión con
+   * `transmisiones.anfitrion_id`; Angular nunca lo envía ni lo elige.
+   */
+  obtenerTokenLiveKit(id: string): Observable<TokenLiveKit> {
+    return this.http
+      .post<{ data: TokenLiveKit }>(`${this.apiUrl}/${id}/token`, {})
+      .pipe(map((res) => res.data));
+  }
+
+  // --- Presencia de espectadores (heartbeat real, sin simulación) -----------
+
+  /** Entra / late. Devuelve los espectadores actuales y totales. */
+  entrarPresencia(id: string): Observable<ConteoEspectadores> {
+    return this.http
+      .post<{ data: Partial<ConteoEspectadores> }>(`${this.apiUrl}/${id}/presencia`, {})
+      .pipe(map((res) => this.aConteo(res.data)));
+  }
+
+  /** Sale: deja de contar en la sesión actual (el total histórico se conserva). */
+  salirPresencia(id: string): Observable<ConteoEspectadores> {
+    return this.http
+      .delete<{ data: Partial<ConteoEspectadores> }>(`${this.apiUrl}/${id}/presencia`)
+      .pipe(map((res) => this.aConteo(res.data)));
+  }
+
+  private aConteo(data?: Partial<ConteoEspectadores>): ConteoEspectadores {
+    return {
+      actuales: typeof data?.actuales === 'number' ? data.actuales : 0,
+      totales: typeof data?.totales === 'number' ? data.totales : 0
+    };
   }
 }

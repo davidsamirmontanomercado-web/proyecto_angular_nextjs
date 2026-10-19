@@ -25,19 +25,73 @@
         <a routerLink="/envivos" class="btn btn-ghost">Ver transmisiones en vivo</a>
       </div>
     </div>
+  } @else if (finalizada()) {
+    <div class="container">
+      <div class="state-card">
+        <div class="state-emoji">🏁</div>
+        <h3>Esta transmisión ya finalizó</h3>
+        <p>
+          El live se cerró y la emisión se detuvo. Esta transmisión ya no admite nuevos
+          espectadores.
+        </p>
+        <a routerLink="/envivos" class="btn btn-ghost">Ver transmisiones en vivo</a>
+      </div>
+    </div>
   } @else {
     <div class="player">
       <div
         class="player-stage"
-        [style.background]="transmision()?.imagen_portada
+        [style.background]="transmision()?.imagen_portada && !camaraActiva() && !videoRemotoActivo()
           ? 'url(' + transmision()!.imagen_portada + ') center/cover no-repeat'
           : null"
       >
-        @if (!transmision()?.imagen_portada) {
-          <div class="ph">{{ espectadores }} espectadores</div>
+        <!-- Video LOCAL del anfitrión (la pista que se está publicando). -->
+        <video
+          #videoLocal
+          class="stage-video host-video"
+          [class.oculto]="!camaraActiva()"
+          autoplay
+          playsinline
+          muted
+        ></video>
+
+        <!-- Video REMOTO: lo que recibe el espectador desde LiveKit. -->
+        <video
+          #videoRemoto
+          class="stage-video remote-video"
+          [class.oculto]="!videoRemotoActivo() || camaraActiva()"
+          autoplay
+          playsinline
+        ></video>
+
+        @if (!transmision()?.imagen_portada && !camaraActiva() && !videoRemotoActivo()) {
+          <div class="ph">👥 {{ espectadoresActuales() }} viendo ahora</div>
         }
 
-        <div class="live-badge">🔴 EN VIVO</div>
+        @if (!esAnfitrion) {
+          @if (!haySesion()) {
+            <div class="no-stream">
+              🔒 Inicia sesión para ver la transmisión en video de este live.
+            </div>
+          } @else if (!videoRemotoActivo()) {
+            <div class="no-stream">{{ avisoEspectador }}</div>
+          }
+          @if (haySesion() && livekitEstado() === 'error') {
+            <button class="stage-btn" (click)="reintentarLiveKit()">🔄 Reintentar conexión</button>
+          }
+          @if (haySesion() && livekitEstado() === 'reconectando') {
+            <div class="conexion-chip">🔄 Reconectando con la emisión…</div>
+          }
+          @if (audioBloqueado()) {
+            <button class="stage-btn audio" (click)="activarAudio()">🔊 Activar sonido</button>
+          }
+        }
+
+        @if (enVivo) {
+          <div class="live-badge">🔴 EN VIVO</div>
+        } @else {
+          <div class="live-badge live-badge-off">🗓️ PROGRAMADA</div>
+        }
         <button class="chat-fab" (click)="toggleChat()" [class.open]="chatVisible">
           {{ chatVisible ? '✕' : '💬' }}
         </button>
@@ -110,7 +164,7 @@
             (click)="toggleLike()"
           >
             <div class="side-ic">👍</div>
-            <div class="side-lb">Me gusta</div>
+            <div class="side-lb">{{ likesTotal() > 0 ? likesTotal() : 'Me gusta' }}</div>
           </button>
           @if (!esPropietario()) {
             <button
@@ -159,17 +213,93 @@
     <div class="container player-meta">
       <h3>{{ transmision()?.titulo || 'Transmisión sin título' }}</h3>
       <p>
-        {{ nombreAnfitrion }} · {{ espectadores }} espectadores
+        {{ nombreAnfitrion }} · 👥 {{ espectadoresActuales() }} viendo ahora ·
+        🧾 {{ espectadoresTotales() }} usuarios únicos
         @if (iniciadaHace) {
           · {{ iniciadaHace }}
         }
         @if (anfitrionAviso()) {
           · <span class="meta-note">{{ anfitrionAviso() }}</span>
         }
+        @if (presenciaError()) {
+          · <span class="meta-note">{{ presenciaError() }}</span>
+        }
       </p>
+
+      @if (avisoSesion()) {
+        <div class="sesion-aviso">
+          <span>{{ avisoSesion() }}</span>
+          <a routerLink="/login">Iniciar sesión</a>
+        </div>
+      }
 
       @if (transmision()?.descripcion) {
         <p class="player-desc">{{ transmision()!.descripcion }}</p>
+      }
+
+      @if (autoresTexto) {
+        <p class="reacciones-autores">👍 Reaccionaron: {{ autoresTexto }}</p>
+      }
+
+      @if (esAnfitrion) {
+        <div class="host-panel">
+          <div class="host-info">
+            <span class="host-badge" [class.on]="enVivo">
+              {{ enVivo ? '🔴 Tu transmisión está en vivo' : '🗓️ Tu transmisión está programada' }}
+            </span>
+            <span class="host-note">
+              @if (enVivo) {
+                @switch (livekitEstado()) {
+                  @case ('conectado') {
+                    Estás emitiendo audio y video en tiempo real. @if (camaraActiva()) { Cámara encendida. } @else { Cámara apagada. } @if (micActivo()) { Micrófono activo. } @else { Micrófono silenciado. }
+                  }
+                  @case ('conectando') {
+                    Conectando con el servidor de emisión…
+                  }
+                  @case ('reconectando') {
+                    Reconectando con la emisión…
+                  }
+                  @case ('error') {
+                    No se pudo conectar con la emisión en tiempo real.
+                  }
+                  @default {
+                    Preparando tu emisión en tiempo real…
+                  }
+                }
+              } @else {
+                Inicia la transmisión para emitir tu cámara y micrófono en tiempo real a los espectadores.
+              }
+            </span>
+          </div>
+          <div class="host-actions">
+            <button class="paction" [disabled]="accionando()" (click)="toggleCamara()">
+              {{ camaraActiva() ? '⏹️ Apagar cámara' : '🎥 Encender cámara' }}
+            </button>
+            @if (enVivo) {
+              <button class="paction" [disabled]="accionando()" (click)="toggleMicrofono()">
+                {{ micActivo() ? '🔇 Silenciar micrófono' : '🎙️ Activar micrófono' }}
+              </button>
+            }
+            @if (!enVivo) {
+              <button class="paction" [disabled]="accionando()" (click)="iniciarTransmision()">
+                {{ accionando() ? 'Iniciando…' : '🔴 Iniciar transmisión' }}
+              </button>
+            } @else {
+              <button class="paction" [disabled]="accionando()" (click)="finalizarTransmision()">
+                {{ accionando() ? 'Finalizando…' : '⏹️ Finalizar transmisión' }}
+              </button>
+            }
+          </div>
+          @if (camaraError()) {
+            <div class="host-error" role="alert">{{ camaraError() }}</div>
+          }
+          @if (enVivo && livekitEstado() === 'error' && livekitError()) {
+            <div class="host-error" role="alert">{{ livekitError() }}</div>
+            <div class="host-actions">
+              <button class="paction" (click)="reintentarLiveKit()">🔄 Reintentar conexión</button>
+            </div>
+          }
+        </div>
       }
 
       <div class="player-actions">
@@ -178,7 +308,7 @@
           [class.active]="likes()"
           [disabled]="likeProcesando()"
           (click)="toggleLike()"
-        >👍 Me gusta</button>
+        >👍 Me gusta @if (likesTotal() > 0) { <span class="paction-num">{{ likesTotal() }}</span> }</button>
 
         <a routerLink="/categorias" class="paction">📦 Ver catálogo</a>
 

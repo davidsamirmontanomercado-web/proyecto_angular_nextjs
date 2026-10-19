@@ -16,17 +16,24 @@ describe('authInterceptor', () => {
   let httpMock: HttpTestingController;
   let getToken: ReturnType<typeof vi.fn>;
   let refresh: ReturnType<typeof vi.fn>;
+  let isLoggedIn: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     getToken = vi.fn().mockReturnValue('token-1');
     refresh = vi.fn().mockResolvedValue(true);
+    // Por defecto la sesión sigue en pie: un refresco fallido transitorio no
+    // debe expulsar al usuario.
+    isLoggedIn = vi.fn().mockReturnValue(true);
 
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         provideHttpClient(withInterceptors([authInterceptor])),
         provideHttpClientTesting(),
-        { provide: AuthService, useValue: { backendUrl: BASE, getToken, refresh } },
+        {
+          provide: AuthService,
+          useValue: { backendUrl: BASE, getToken, refresh, isLoggedIn },
+        },
       ],
     });
 
@@ -92,11 +99,12 @@ describe('authInterceptor', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it('si la renovación falla, no reintenta, redirige a /login y propaga el error', async () => {
+  it('si la renovación falla y la sesión quedó inservible, redirige a /login y propaga el error', async () => {
     const router = TestBed.inject(Router);
     const navegar = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
 
     refresh.mockResolvedValue(false);
+    isLoggedIn.mockReturnValue(false);
     let errorRecibido = false;
     http.get(URL).subscribe({ error: () => (errorRecibido = true) });
 
@@ -107,6 +115,26 @@ describe('authInterceptor', () => {
 
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(navegar).toHaveBeenCalledWith('/login');
+    expect(errorRecibido).toBe(true);
+    httpMock.expectNone(URL);
+  });
+
+  it('si la renovación falla de forma transitoria no cierra sesión ni navega', async () => {
+    const router = TestBed.inject(Router);
+    const navegar = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    refresh.mockResolvedValue(false);
+    isLoggedIn.mockReturnValue(true);
+    let errorRecibido = false;
+    http.get(URL).subscribe({ error: () => (errorRecibido = true) });
+
+    const req1 = httpMock.expectOne(URL);
+    req1.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    await siguienteTick();
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(navegar).not.toHaveBeenCalled();
     expect(errorRecibido).toBe(true);
     httpMock.expectNone(URL);
   });

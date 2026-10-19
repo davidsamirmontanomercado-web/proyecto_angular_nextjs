@@ -21,7 +21,13 @@
     <div class="grid-auto">
       @for (c of categorias; track c.id) {
         <a routerLink="/envivos" class="cat-card">
-          <div class="cat-icon">{{ c.ic }}</div>
+          <div class="cat-icon">
+            @if (c.icUrl) {
+              <img [src]="c.icUrl" [alt]="c.name" loading="lazy" (error)="onIconoError(c)">
+            } @else {
+              <span class="cat-emoji" aria-hidden="true">{{ c.ic }}</span>
+            }
+          </div>
           <div class="cat-name">{{ c.name }}</div>
           <div class="cat-count">{{ c.sub }}</div>
         </a>

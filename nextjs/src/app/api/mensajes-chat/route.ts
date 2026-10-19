@@ -6,8 +6,9 @@ import {
   UUID_RE
 } from '@/lib/api/http';
 
-// Columnas reales verificadas en public.mensajes_chat:
-// id, transmision_id, contenido, tipo, respondido, remitente_id, fecha.
+// Columnas reales de public.mensajes_chat (10):
+// id, transmision_id, remitente_id, destinatario_id, contenido,
+// tipo, fecha, fijado, oculto, respondido.
 // Regla de seguridad: el cliente NUNCA elige `tipo`, por lo que no puede
 // enviar mensajes con los tipos restringidos ("privado", "respuesta_vendedor").
 const TABLA = 'mensajes_chat';
@@ -50,6 +51,8 @@ export async function GET(request: Request) {
       .from(TABLA)
       .select(MENSAJE_SELECT)
       .eq('transmision_id', transmisionId)
+      .eq('oculto', false) // ninguna política RLS cubre `oculto`
+      .in('tipo', ['pregunta', 'comentario']) // excluye 'privado' y 'respuesta_vendedor'
       .order('fecha', { ascending: true })
       .limit(MAX_MENSAJES);
 

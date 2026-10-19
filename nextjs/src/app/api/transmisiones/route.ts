@@ -6,6 +6,7 @@ import {
   UUID_RE
 } from '@/lib/api/http';
 import { createServerSupabase } from '@/lib/supabase/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Regla de negocio confirmada: /envivos sólo muestra transmisiones en vivo.
 // Valores reales verificados en public.transmisiones.estado.
@@ -50,6 +51,46 @@ export function OPTIONS(request: Request) {
   return CORS.empty(request);
 }
 
+// Vista agregada de presencia (security_invoker = false).
+const VISTA_CONTEO = 'transmisiones_espectadores_publico';
+
+type FilaTransmision = { id: string; espectadores_actuales?: number | null; espectadores_totales?: number | null };
+
+// Fusiona los contadores reales de espectadores en las filas del listado.
+// Si la vista no existe todavía, devuelve las filas sin cambios.
+async function conConteoDeEspectadores(
+  supabase: SupabaseClient,
+  filas: FilaTransmision[]
+): Promise<FilaTransmision[]> {
+  if (filas.length === 0) return filas;
+
+  try {
+    const { data: conteos, error } = await supabase
+      .schema('public')
+      .from(VISTA_CONTEO)
+      .select('transmision_id,actuales,totales')
+      .in(
+        'transmision_id',
+        filas.map((f) => f.id)
+      );
+
+    if (error || !conteos) return filas;
+
+    const mapa = new Map<string, { actuales: number; totales: number }>();
+    for (const c of conteos as Array<{ transmision_id: string; actuales: number; totales: number }>) {
+      mapa.set(c.transmision_id, { actuales: c.actuales ?? 0, totales: c.totales ?? 0 });
+    }
+
+    return filas.map((f) => {
+      const c = mapa.get(f.id);
+      if (!c) return f;
+      return { ...f, espectadores_actuales: c.actuales, espectadores_totales: c.totales };
+    });
+  } catch {
+    return filas;
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const supabase = await createServerSupabase();
@@ -81,7 +122,13 @@ export async function GET(request: Request) {
       console.error('Error fetching transmisiones:', error);
       return CORS.json(request, { error: 'Error interno del servidor' }, 500);
     }
-    const transmisiones = data ?? [];
+
+    // Contadores reales de espectadores (vista agregada). Si la vista aún no
+    // existe (migración pendiente), se devuelven los valores de la tabla sin
+    // romper la respuesta.
+    const filas = (data ?? []) as unknown as FilaTransmision[];
+    const transmisiones = await conConteoDeEspectadores(supabase, filas);
+
     return CORS.json(
       request,
       { data: transmisiones, meta: { count: transmisiones.length } },

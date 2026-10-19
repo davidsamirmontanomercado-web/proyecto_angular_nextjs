@@ -36,6 +36,17 @@
   color:rgba(255,255,255,.35);font-size:14px;
   font-weight:600;letter-spacing:.3px;
 }
+/* Aviso: no llega video del anfitrión (sin proveedor de streaming configurado).
+   Evita que la portada se interprete como una emisión real. */
+.player-stage .no-stream{
+  position:absolute;left:18px;top:64px;z-index:4;
+  max-width:min(70%,420px);
+  background:rgba(15,23,42,.55);border:1px solid rgba(255,255,255,.14);
+  color:rgba(255,255,255,.85);font-size:12px;font-weight:600;line-height:1.4;
+  padding:7px 12px;border-radius:12px;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  pointer-events:none;
+}
 
 /* Badge EN VIVO */
 .live-badge{
@@ -86,16 +97,17 @@
   position:absolute;
   top:72px;right:18px;bottom:90px;
   width:340px;
-  background:rgba(17,24,39,.88);
-  backdrop-filter:blur(18px);
-  -webkit-backdrop-filter:blur(18px);
-  border:1px solid rgba(255,255,255,.1);
+  /* Semitransparente para que el vídeo se vea detrás sin perder legibilidad. */
+  background:rgba(15,23,42,.38);
+  backdrop-filter:blur(12px) saturate(130%);
+  -webkit-backdrop-filter:blur(12px) saturate(130%);
+  border:1px solid rgba(255,255,255,.16);
   border-radius:18px;
   display:flex;flex-direction:column;
   transition:all .35s cubic-bezier(.4,0,.2,1);
   z-index:6;
   overflow:hidden;
-  box-shadow:0 12px 40px rgba(0,0,0,.45);
+  box-shadow:0 12px 40px rgba(0,0,0,.35);
 }
 .chat-overlay.hidden{
   opacity:0;transform:translateX(30px);pointer-events:none;
@@ -126,11 +138,11 @@
 /* Burbujas */
 .bubble{
   display:block;
-  background:rgba(255,255,255,.06);
+  background:rgba(0,0,0,.42);
   padding:9px 12px;
   border-radius:14px;
   line-height:1.4;
-  border:1px solid rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1);
   word-break:break-word;
   animation:bubble-in .4s cubic-bezier(.34,1.56,.64,1);
 }
@@ -141,9 +153,11 @@
 .bubble-name{
   color:#fbbf24;font-weight:800;font-size:12.5px;
   margin-right:7px;
+  text-shadow:0 1px 2px rgba(0,0,0,.7);
 }
 .bubble-text{
   color:#fff;font-size:13px;font-weight:500;
+  text-shadow:0 1px 2px rgba(0,0,0,.7);
 }
 .bubble.tu{
   background:linear-gradient(135deg,rgba(99,102,241,.35),rgba(139,92,246,.35));
@@ -238,6 +252,81 @@
 }
 .paction:hover{background:var(--bg-elev);border-color:var(--border);transform:translateY(-2px)}
 .paction.active{background:var(--text);color:#fff;border-color:var(--text)}
+.paction:disabled{opacity:.6;cursor:default;transform:none}
+.paction-num{
+  background:rgba(0,0,0,.12);border-radius:100px;
+  padding:1px 7px;font-size:11.5px;font-weight:800;
+}
+.paction.active .paction-num{background:rgba(255,255,255,.22)}
+.reacciones-autores{
+  margin:0 0 14px;font-size:12.5px;color:var(--text-soft);
+}
+
+/* ============ PANEL DEL ANFITRIÓN (su propia emisión) ============ */
+.host-panel{
+  background:var(--bg-soft);border:1px solid var(--border);
+  border-radius:var(--r-md);padding:16px;margin:0 0 16px;
+  display:flex;flex-direction:column;gap:12px;
+}
+.host-info{display:flex;flex-direction:column;gap:6px}
+.host-badge{
+  display:inline-block;align-self:flex-start;
+  font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--text-mute);
+}
+.host-badge.on{color:#ef4444}
+.host-note{font-size:12.5px;color:var(--text-soft);line-height:1.5}
+.host-actions{display:flex;gap:8px;flex-wrap:wrap}
+.host-error{
+  font-size:12.5px;font-weight:600;color:#b91c1c;
+  background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);
+  border-radius:var(--r-sm);padding:9px 12px;
+}
+/* ============ VIDEO REAL (LiveKit: local del anfitrión / remoto) ============ */
+.stage-video{
+  position:absolute;inset:0;z-index:1;
+  width:100%;height:100%;
+  object-fit:cover;background:#000;
+}
+.stage-video.host-video{object-fit:cover}
+.stage-video.remote-video{object-fit:contain}
+/* Oculta el <video> cuando no hay pista: no debe tapar portada ni placeholders. */
+.stage-video.oculto{display:none}
+.host-video{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;background:#000;
+}
+
+/* Botones flotantes sobre el stage (reintentar, activar sonido) */
+.stage-btn{
+  position:absolute;left:18px;bottom:96px;z-index:6;
+  display:inline-flex;align-items:center;gap:8px;
+  padding:10px 16px;border-radius:100px;border:none;
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;
+  font-size:12.5px;font-weight:700;font-family:inherit;
+  cursor:pointer;transition:all .25s var(--ease);
+  box-shadow:0 6px 20px rgba(99,102,241,.45);
+}
+.stage-btn:hover{transform:translateY(-2px);opacity:.96}
+.stage-btn:active{transform:translateY(0) scale(.97)}
+.stage-btn.audio{
+  background:linear-gradient(135deg,#10b981,#059669);
+  box-shadow:0 6px 20px rgba(16,185,129,.45);
+}
+/* Chip de estado de conexión (p. ej. reconectando) */
+.conexion-chip{
+  position:absolute;left:18px;top:104px;z-index:6;
+  display:inline-flex;align-items:center;gap:7px;
+  padding:7px 13px;border-radius:100px;
+  background:rgba(15,23,42,.6);border:1px solid rgba(255,255,255,.16);
+  color:rgba(255,255,255,.9);font-size:12px;font-weight:600;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  pointer-events:none;
+}
+.live-badge-off{
+  background:rgba(255,255,255,.16);color:#fff;
+  box-shadow:none;animation:none;
+}
 
 /* ============ EN VIVOS RECOMENDADOS ============ */
 .recs{margin-top:56px;padding-bottom:20px}
@@ -347,6 +436,18 @@
 }
 .chat-login:hover{background:rgba(99,102,241,.3)}
 .meta-note{color:var(--text-mute)}
+.sesion-aviso{
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+  margin-top:12px;padding:10px 14px;border-radius:12px;
+  background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);
+  color:#fde68a;font-size:13px;line-height:1.5;
+}
+.sesion-aviso a{
+  color:#c7d2fe;font-weight:700;text-decoration:none;
+  padding:5px 14px;border-radius:100px;
+  background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.4);
+}
+.sesion-aviso a:hover{background:rgba(99,102,241,.3)}
 .player-desc{margin-top:12px;font-size:13.5px;color:var(--text-soft);line-height:1.6}
 .recs-empty{
   grid-column:1/-1;text-align:center;

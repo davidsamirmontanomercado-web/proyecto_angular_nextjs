@@ -20,6 +20,12 @@ export const RETRIED_AFTER_REFRESH = new HttpContextToken<boolean>(() => false);
  * local `yaReintentado` garantiza un único reintento por petición (sin bucles).
  * Los endpoints /api/auth/* quedan excluidos para no interpretar sus 401 como
  * sesión expirada.
+ *
+ * Si la renovación falla, sólo se lleva al usuario a /login cuando la sesión
+ * quedó realmente inservible (AuthService.refresh ya limpió las credenciales).
+ * Ante un fallo transitorio se propaga el 401 sin cerrar sesión ni navegar, para
+ * no mostrar "sesión caducada" ni provocar redirecciones que el guard de /login
+ * revertiría (bucle).
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
@@ -52,7 +58,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       return from(auth.refresh()).pipe(
         switchMap((renovado) => {
           if (!renovado) {
-            router.navigateByUrl('/login');
+            // `refresh()` limpia las credenciales cuando la sesión es
+            // irrecuperable; entonces el usuario ya no está autenticado y el
+            // guard de /login no vuelve a rebotarlo (sin bucle).
+            if (!auth.isLoggedIn()) {
+              router.navigateByUrl('/login');
+            }
             return throwError(() => err);
           }
 

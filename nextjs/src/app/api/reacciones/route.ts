@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   cors,
   leerCuerpoJson,
@@ -12,10 +13,42 @@ import {
 const TABLA = 'reacciones';
 const TIPO_ME_GUSTA = 'me_gusta';
 
+// Vista agregada (security_invoker = false) que resume las reacciones de una
+// transmisión sin debilitar la RLS de `public.reacciones`. Ver la migración
+// 20261017130000_reacciones_presencia.sql.
+const VISTA_RESUMEN = 'transmisiones_reacciones_publico';
+
 const CORS = cors('GET, POST, DELETE, OPTIONS');
 
 export function OPTIONS(request: Request) {
   return CORS.empty(request);
+}
+
+type ResumenReacciones = { total: number; autores: string[] };
+
+// Lee el resumen agregado. Si la vista aún no existe (migración pendiente) o
+// falla, se degrada a 0/[] en lugar de romper el me gusta, que es lo primario.
+async function leerResumen(db: SupabaseClient, transmisionId: string): Promise<ResumenReacciones> {
+  try {
+    const { data, error } = await db
+      .schema('public')
+      .from(VISTA_RESUMEN)
+      .select('total,autores')
+      .eq('transmision_id', transmisionId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Resumen de reacciones no disponible:', error.code ?? error.message);
+      return { total: 0, autores: [] };
+    }
+
+    const total = typeof data?.total === 'number' ? data.total : 0;
+    const autores = Array.isArray(data?.autores) ? (data.autores as string[]) : [];
+    return { total, autores };
+  } catch (err) {
+    console.warn('Error inesperado leyendo el resumen de reacciones:', err);
+    return { total: 0, autores: [] };
+  }
 }
 
 // GET /api/reacciones?transmision_id=<uuid> -> ¿el usuario autenticado dio me gusta?
@@ -48,7 +81,12 @@ export async function GET(request: Request) {
       return CORS.json(request, { error: mapped!.mensaje }, mapped!.status);
     }
 
-    return CORS.json(request, { data: { me_gusta: Boolean(data) } }, 200);
+    const resumen = await leerResumen(auth.db, transmisionId);
+    return CORS.json(
+      request,
+      { data: { me_gusta: Boolean(data), total: resumen.total, autores: resumen.autores } },
+      200
+    );
   } catch (err) {
     console.error('Error inesperado consultando reacción:', err);
     return CORS.json(request, { error: 'Error interno del servidor.' }, 500);
@@ -87,14 +125,24 @@ export async function POST(request: Request) {
     if (error) {
       // 23505 = ya existía: se evita el duplicado.
       if (error.code === '23505') {
-        return CORS.json(request, { data: { me_gusta: true } }, 200);
+        const resumen = await leerResumen(auth.db, transmisionId);
+        return CORS.json(
+          request,
+          { data: { me_gusta: true, total: resumen.total, autores: resumen.autores } },
+          200
+        );
       }
       console.error('Error creando reacción:', error);
       const mapped = mapErrorBD(error);
       return CORS.json(request, { error: mapped!.mensaje }, mapped!.status);
     }
 
-    return CORS.json(request, { data: { me_gusta: true } }, 201);
+    const resumen = await leerResumen(auth.db, transmisionId);
+    return CORS.json(
+      request,
+      { data: { me_gusta: true, total: resumen.total, autores: resumen.autores } },
+      201
+    );
   } catch (err) {
     console.error('Error inesperado creando reacción:', err);
     return CORS.json(request, { error: 'Error interno del servidor.' }, 500);
@@ -130,9 +178,17 @@ export async function DELETE(request: Request) {
       return CORS.json(request, { error: mapped!.mensaje }, mapped!.status);
     }
 
+    const resumen = await leerResumen(auth.db, transmisionId);
     return CORS.json(
       request,
-      { data: { me_gusta: false, eliminado: (count ?? 0) > 0 } },
+      {
+        data: {
+          me_gusta: false,
+          eliminado: (count ?? 0) > 0,
+          total: resumen.total,
+          autores: resumen.autores
+        }
+      },
       200
     );
   } catch (err) {
