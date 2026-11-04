@@ -1,0 +1,124 @@
+<app-navbar></app-navbar>
+
+<main class="admin-wrap">
+  <header class="admin-head">
+    <div class="admin-head-text">
+      <span class="eyebrow">Panel de administración</span>
+      <h1>Gestión de usuarios</h1>
+      <p>Administra los roles de las cuentas y aprueba solicitudes de vendedor.</p>
+    </div>
+
+    <div class="admin-actions">
+      <button class="btn-refresh" (click)="cargar()" [disabled]="cargando()">
+        <span class="refresh-icon">↻</span>
+        Recargar
+      </button>
+      <div class="admin-tabs">
+        <button class="tab-btn" [class.active]="vista() === 'usuarios'" (click)="setVista('usuarios')">Usuarios</button>
+        <button class="tab-btn" [class.active]="vista() === 'solicitudes'" (click)="setVista('solicitudes')">
+          Solicitudes
+          @if (solicitudes().length > 0 && vista() === 'usuarios') {
+            <span class="tab-badge">{{ solicitudes().length }}</span>
+          }
+        </button>
+      </div>
+    </div>
+
+    @if (vista() === 'usuarios') {
+      <input
+        class="admin-search"
+        type="search"
+        placeholder="Buscar por nombre o correo…"
+        [value]="filtro()"
+        (input)="filtro.set($any($event.target).value)">
+    }
+  </header>
+
+  @if (cargando()) {
+    <div class="admin-state">Cargando datos…</div>
+  } @else if (vista() === 'usuarios') {
+    @if (visibles().length === 0) {
+      <div class="admin-state">No hay usuarios que coincidan con la búsqueda.</div>
+    } @else {
+      <div class="admin-table">
+        <div class="admin-row admin-row-head">
+          <span>Usuario</span>
+          <span>Correo</span>
+          <span>Alta</span>
+          <span>Rol</span>
+        </div>
+
+        @for (u of visibles(); track u.id) {
+          <div class="admin-row">
+            <span class="cell-user">
+              <span class="cell-avatar">{{ iniciales(u) }}</span>
+              <span class="cell-name">{{ u.nombre || 'Sin nombre' }}</span>
+            </span>
+            <span class="cell-mail">{{ u.correo || '—' }}</span>
+            <span class="cell-date">{{ fecha(u.fecha_registro) }}</span>
+            <span class="cell-role">
+              @if (u.id === idActual()) {
+                <span class="role-badge" [class]="'role-' + rolEfectivo(u)">
+                  {{ etiquetaRol(u) }} · tú
+                </span>
+              } @else {
+                <div class="role-flex">
+                  <select
+                    class="role-select"
+                    [class]="'role-' + rolEfectivo(u)"
+                    [disabled]="guardandoId() === u.id"
+                    (change)="onRolChange(u, $event)">
+                    @for (r of roles; track r) {
+                      <option [value]="r" [selected]="r === rolEfectivo(u)">
+                        {{ etiquetaRol(r) }}
+                      </option>
+                    }
+                  </select>
+                  
+                  @if (rolEfectivo(u) === 'vendedor') {
+                    <span class="status-badge status-vendedor">VENDEDOR</span>
+                  } @else if (rolEfectivo(u) === 'administrador') {
+                    <span class="status-badge status-admin">ADMIN</span>
+                  }
+                </div>
+              }
+            </span>
+          </div>
+        }
+      </div>
+    }
+  } @else {
+    @if (solicitudes().length === 0) {
+      <div class="admin-state">No hay solicitudes de vendedor pendientes.</div>
+    } @else {
+      <div class="admin-table">
+        <div class="admin-row admin-row-head">
+          <span>Usuario</span>
+          <span>Mensaje</span>
+          <span>Fecha</span>
+          <span>Acciones</span>
+        </div>
+
+        @for (s of solicitudes(); track s.id) {
+          <div class="admin-row">
+            <span class="cell-user">
+              <span class="cell-avatar">{{ auth.initials(s.usuarios?.nombre || s.usuarios?.correo || '') }}</span>
+              <div class="cell-info">
+                <span class="cell-name">{{ s.usuarios?.nombre || 'Sin nombre' }}</span>
+                <span class="cell-mail-sub">{{ s.usuarios?.correo }}</span>
+              </div>
+            </span>
+            <span class="cell-msg">{{ s.mensaje }}</span>
+            <span class="cell-date">{{ fecha(s.fecha_solicitud) }}</span>
+            <span class="cell-actions">
+              <button class="btn-approve" (click)="resolverSolicitud(s.id, 'aprobar')" [disabled]="guardandoId() === s.id">✓</button>
+              <button class="btn-reject" (click)="resolverSolicitud(s.id, 'rechazar')" [disabled]="guardandoId() === s.id">✕</button>
+            </span>
+          </div>
+        }
+      </div>
+    }
+  }
+</main>
+
+<app-footer></app-footer>

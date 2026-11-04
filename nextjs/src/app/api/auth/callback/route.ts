@@ -1,0 +1,158 @@
+import { NextResponse } from 'next/server';
+import { createServerSupabase, authCookieOptions } from '@/lib/supabase/server';
+import { getAllowedOrigins } from '@/lib/api/http';
+
+function getBaseUrl(request: Request): string {
+  const envSiteUrl = process.env.SITE_URL;
+
+  if (envSiteUrl) {
+    return envSiteUrl.replace(/\/+$/, '');
+  }
+
+  const host =
+    request.headers.get('x-forwarded-host') ||
+    request.headers.get('host');
+
+  const proto =
+    request.headers.get('x-forwarded-proto') || 'http';
+
+  if (host) {
+    return `${proto}://${host}`;
+  }
+
+  return 'http://localhost:3000';
+}
+
+function readCookie(request: Request, name: string): string | null {
+  const header = request.headers.get('cookie');
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx === -1) continue;
+    const key = part.slice(0, idx).trim();
+    if (key === name) return decodeURIComponent(part.slice(idx + 1).trim());
+  }
+  return null;
+}
+
+// Base del frontend a la que volver. Usa la cookie `oauth_origin` fijada por
+// /api/auth/google, validándola SIEMPRE contra la allowlist (anti open-redirect).
+// Si no existe o no es válida, cae al primer origen permitido.
+function resolveAngularBase(request: Request): string {
+  const allowed = getAllowedOrigins();
+  const fromCookie = readCookie(request, 'oauth_origin');
+  if (fromCookie) {
+    const normalized = fromCookie.replace(/\/+$/, '');
+    if (allowed.includes(normalized)) return normalized;
+  }
+  return allowed[0].replace(/\/+$/, '');
+}
+
+export async function GET(request: Request) {
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get('code');
+  const error = requestUrl.searchParams.get('error');
+  const baseUrl = getBaseUrl(request);
+
+  if (error || !code) {
+    const errorDesc = requestUrl.searchParams.get('error_description');
+    console.error('[OAuth Callback] Error o sin código:', { error, errorDesc });
+    const url = new URL('/google-auth/login', baseUrl);
+    url.searchParams.set('error', error || 'oauth_denied');
+    if (errorDesc) url.searchParams.set('desc', encodeURIComponent(errorDesc));
+    return NextResponse.redirect(url);
+  }
+
+  try {
+    const supabase = await createServerSupabase();
+
+    const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (sessionError || !data.session) {
+      console.error('[OAuth Callback] Error al intercambiar código por sesión:', sessionError);
+      const url = new URL('/google-auth/login', baseUrl);
+      const errCode = sessionError?.status === 400 ? 'invalid_request' : (sessionError?.name || 'session_failed');
+      url.searchParams.set('error', String(errCode));
+      const errMsg = sessionError?.message || 'No se pudo establecer la sesión.';
+      if (errMsg) url.searchParams.set('desc', encodeURIComponent(errMsg));
+      return NextResponse.redirect(url);
+    }
+
+    const { access_token, refresh_token, expires_in = 3600, user } = data.session;
+
+    // Detectar si el usuario tiene MFA (2FA) activo
+    const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+    const activeFactor = !factorsError && factors && factors.all.find(f => f.status === 'verified');
+
+    const angularBase = resolveAngularBase(request);
+    const isRecovery = requestUrl.searchParams.get('type') === 'recovery';
+
+    // Si es recuperación de contraseña, redirigimos a la página específica en Angular.
+    if (isRecovery) {
+      const recoveryUrl = new URL(`${angularBase}/restablecer-contrasena`);
+      recoveryUrl.searchParams.set('token', access_token);
+      return NextResponse.redirect(recoveryUrl);
+    }
+
+    // El rol real viene en la metadata si ya existe; para un alta nueva vía
+    // Google se asigna 'comprador' por defecto.
+    const rolUsuario =
+      typeof user?.user_metadata?.rol === 'string' && user.user_metadata.rol
+        ? user.user_metadata.rol
+        : 'comprador';
+
+    const angularUser = {
+      id: user?.id,
+      nombre:
+        (user?.user_metadata?.full_name as string) ||
+        (user?.user_metadata?.name as string) ||
+        (user?.email ? user.email.split('@')[0] : 'Usuario'),
+      correo: user?.email || '',
+      rol: rolUsuario,
+      createdAt: user?.created_at ? new Date(user.created_at).getTime() : Date.now(),
+    };
+
+    const json = JSON.stringify(angularUser);
+    let userB64 = '';
+    try {
+      if (typeof Buffer !== 'undefined') {
+        userB64 = Buffer.from(json, 'utf-8').toString('base64url');
+      } else {
+        userB64 = btoa(String.fromCharCode(...new TextEncoder().encode(json)))
+          .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+    } catch {
+      userB64 = encodeURIComponent(json);
+    }
+    const successUrl = new URL(`${angularBase}/google-auth`);
+    successUrl.searchParams.set('user', userB64);
+    successUrl.searchParams.set('at', access_token);
+    successUrl.searchParams.set('rt', refresh_token || '');
+    
+    if (activeFactor) {
+      successUrl.searchParams.set('mfa', '1');
+      successUrl.searchParams.set('fid', activeFactor.id);
+    }
+
+    const next = NextResponse.redirect(successUrl);
+    // La cookie de origen ya no hace falta: se limpia para no reutilizarla.
+    next.cookies.set('oauth_origin', '', { path: '/api/auth', maxAge: 0 });
+    next.cookies.set('sb-access-token', access_token, authCookieOptions(expires_in));
+    next.cookies.set('sb-refresh-token', refresh_token!, authCookieOptions(60 * 60 * 24 * 30));
+    if (user?.email) {
+      next.cookies.set('sb-user-email', user.email, {
+        ...authCookieOptions(expires_in),
+        httpOnly: false,
+      });
+    }
+
+    return next;
+  } catch (err) {
+    console.error('[OAuth Callback] Error inesperado:', err);
+    const errorUrl = new URL('/google-auth/login', baseUrl);
+    const errMsg = err instanceof Error ? err.message : 'Ocurrió un error desconocido';
+    errorUrl.searchParams.set('error', 'server_error');
+    errorUrl.searchParams.set('desc', encodeURIComponent(errMsg));
+    return NextResponse.redirect(errorUrl);
+  }
+}

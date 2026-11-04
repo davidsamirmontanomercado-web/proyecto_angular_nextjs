@@ -1,0 +1,189 @@
+<app-navbar></app-navbar>
+
+<main class="container page-top" style="padding-bottom:60px">
+  @if (auth.esAdminVista()) {
+    <!-- ===================== VISTA ADMINISTRADOR ===================== -->
+    <div class="dash-head">
+      <div>
+        <span class="vista-pill">Modo administrador</span>
+        <h1>Panel de administración</h1>
+        <p>Hola, {{ nombre }} · Control general de LiveMarket</p>
+      </div>
+      <div class="dash-actions">
+        <a routerLink="/admin/usuarios" class="btn btn-accent">🛡️ Gestionar usuarios</a>
+        <a routerLink="/envivos" class="btn btn-ghost">Ver en vivos</a>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Usuarios</div><div class="kpi-num">{{ usuariosTotal() | number }}</div><div class="kpi-delta neutral">Registrados</div></div>
+      <div class="kpi"><div class="kpi-label">Solicitudes</div><div class="kpi-num">{{ solicitudes().length | number }}</div><div class="kpi-delta neutral">Pendientes</div></div>
+      <div class="kpi"><div class="kpi-label">Transmisiones</div><div class="kpi-num">{{ transmisionesTotal() | number }}</div><div class="kpi-delta neutral">En total</div></div>
+      <div class="kpi"><div class="kpi-label">En vivo ahora</div><div class="kpi-num">{{ enVivosAhora() | number }}</div><div class="kpi-delta neutral">Activas</div></div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Solicitudes de vendedor</h3>
+          <a routerLink="/admin/usuarios">Gestionar →</a>
+        </div>
+        <div class="list">
+          @if (solicitudes().length === 0) {
+            <div class="list-item">
+              <div class="list-meta"><h4>Sin solicitudes pendientes</h4><p>No hay usuarios solicitando ser vendedor.</p></div>
+            </div>
+          } @else {
+            @for (s of solicitudes(); track s.id) {
+              <div class="list-item">
+                <div class="list-thumb">{{ auth.initials(s.usuarios?.nombre || s.usuarios?.correo) }}</div>
+                <div class="list-meta">
+                  <h4>{{ s.usuarios?.nombre || 'Sin nombre' }}</h4>
+                  <p>{{ s.usuarios?.correo }} · {{ s.mensaje }}</p>
+                </div>
+                <span class="badge badge-soft">Pendiente</span>
+              </div>
+            }
+          }
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Acciones rápidas</h3></div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <a routerLink="/admin/usuarios" class="btn btn-accent btn-full">🛡️ Gestionar usuarios</a>
+          <a routerLink="/categorias" class="btn btn-ghost btn-full">🗂️ Explorar categorías</a>
+          <a routerLink="/envivos" class="btn btn-ghost btn-full">📺 Ver en vivos</a>
+          <a routerLink="/configuracion" class="btn btn-ghost btn-full">⚙️ Configuración</a>
+          <button class="btn btn-danger btn-full" (click)="logout()">Cerrar sesión</button>
+        </div>
+      </div>
+    </div>
+  } @else if (auth.esVendedorVista()) {
+    <!-- ===================== VISTA VENDEDOR ===================== -->
+    <div class="dash-head">
+      <div>
+        <span class="vista-pill">Modo vendedor</span>
+        <h1>Hola, {{ nombre }} 🎬</h1>
+        <p>Resumen de tus transmisiones y ventas en LiveMarket</p>
+      </div>
+      <div class="dash-actions">
+        <a routerLink="/crear-live" class="btn btn-live">🔴 Hacer en vivo</a>
+        <a routerLink="/envivos" class="btn btn-ghost">Ver en vivos</a>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Transmisiones</div><div class="kpi-num">{{ totalTransmisiones() | number }}</div><div class="kpi-delta neutral">En total</div></div>
+      <div class="kpi"><div class="kpi-label">En vivo ahora</div><div class="kpi-num">{{ enVivo() | number }}</div><div class="kpi-delta neutral">Activas</div></div>
+      <div class="kpi"><div class="kpi-label">Espectadores</div><div class="kpi-num">{{ espectadoresTotales() | number }}</div><div class="kpi-delta neutral">Acumulado</div></div>
+      <div class="kpi"><div class="kpi-label">Finalizadas</div><div class="kpi-num">{{ finalizadas() | number }}</div><div class="kpi-delta neutral">Histórico</div></div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Mis transmisiones</h3>
+          <a href="#" (click)="cargarMias(); $event.preventDefault()">Actualizar →</a>
+        </div>
+        <div class="list">
+          @if (cargando()) {
+            <div class="list-item">
+              <div class="list-meta"><p>Cargando…</p></div>
+            </div>
+          } @else if (misTransmisiones().length === 0) {
+            <div class="list-item">
+              <div class="list-meta"><h4>Aún no tienes transmisiones</h4><p>Crea tu primer en vivo para verlo aquí.</p></div>
+            </div>
+          } @else {
+            @for (t of misTransmisiones(); track t.id) {
+              <div class="list-item">
+                <div class="list-thumb">{{ icono(t.estado) }}</div>
+                <div class="list-meta">
+                  <h4>{{ t.titulo || 'Sin título' }}</h4>
+                  <p>{{ meta(t) }}</p>
+                </div>
+                <span [class]="claseBadge(t.estado)">{{ etiqueta(t.estado) }}</span>
+                @if (t.estado === 'programada') {
+                  <button class="btn btn-live" style="margin-left:12px" [disabled]="accionandoId() === t.id" (click)="iniciar(t.id)">Iniciar</button>
+                } @else if (t.estado === 'en_vivo') {
+                  <button class="btn btn-danger" style="margin-left:12px" [disabled]="accionandoId() === t.id" (click)="finalizar(t.id)">Finalizar</button>
+                }
+              </div>
+            }
+          }
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Acciones rápidas</h3></div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <a routerLink="/crear-live" class="btn btn-accent btn-full">🔴 Crear nuevo en vivo</a>
+          <a routerLink="/perfil" class="btn btn-ghost btn-full">👤 Editar perfil</a>
+          <a routerLink="/categorias" class="btn btn-ghost btn-full">🗂️ Explorar categorías</a>
+          <a routerLink="/configuracion" class="btn btn-ghost btn-full">⚙️ Configuración</a>
+          <button class="btn btn-danger btn-full" (click)="logout()">Cerrar sesión</button>
+        </div>
+      </div>
+    </div>
+  } @else {
+    <!-- ===================== VISTA COMPRADOR ===================== -->
+    <div class="dash-head">
+      <div>
+        <span class="vista-pill">Modo comprador</span>
+        <h1>Hola, {{ nombre }} 🛍️</h1>
+        <p>Tu actividad de compras en LiveMarket</p>
+      </div>
+      <div class="dash-actions">
+        <a routerLink="/comprar" class="btn btn-accent">🛍️ Ir a la tienda</a>
+        <a routerLink="/envivos" class="btn btn-ghost">Ver en vivos</a>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">En el carrito</div><div class="kpi-num">{{ itemsCarrito() | number }}</div><div class="kpi-delta neutral">Productos</div></div>
+      <div class="kpi"><div class="kpi-label">Valor del carrito</div><div class="kpi-num kpi-money">{{ valorCarrito() | currency:'USD':'symbol':'1.0-0' }}</div><div class="kpi-delta neutral">Estimado</div></div>
+      <div class="kpi"><div class="kpi-label">En vivo ahora</div><div class="kpi-num">{{ enVivosAhora() | number }}</div><div class="kpi-delta neutral">Transmisiones</div></div>
+      <div class="kpi"><div class="kpi-label">Categorías</div><div class="kpi-num">{{ totalCategorias() | number }}</div><div class="kpi-delta neutral">Disponibles</div></div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Mi carrito</h3>
+          <a routerLink="/comprar">Ir a la tienda →</a>
+        </div>
+        <div class="list">
+          @if (carrito().length === 0) {
+            <div class="list-item">
+              <div class="list-meta"><h4>Tu carrito está vacío</h4><p>Explora la tienda y añade tus productos favoritos.</p></div>
+            </div>
+          } @else {
+            @for (item of carrito(); track $index) {
+              <div class="list-item">
+                <div class="list-thumb">🛍️</div>
+                <div class="list-meta">
+                  <h4>{{ item.producto.nombre }}</h4>
+                  <p>{{ item.producto.precio | currency:'USD':'symbol':'1.0-0' }} × {{ item.cantidad }}</p>
+                </div>
+                <span class="badge badge-soft">{{ (item.producto.precio * item.cantidad) | currency:'USD':'symbol':'1.0-0' }}</span>
+              </div>
+            }
+          }
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Acciones rápidas</h3></div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <a routerLink="/comprar" class="btn btn-accent btn-full">🛍️ Explorar catálogo</a>
+          <a routerLink="/envivos" class="btn btn-ghost btn-full">📺 Ver en vivos</a>
+          <a routerLink="/categorias" class="btn btn-ghost btn-full">🗂️ Explorar categorías</a>
+          <a routerLink="/perfil" class="btn btn-ghost btn-full">👤 Ver mi perfil</a>
+          <a routerLink="/configuracion" class="btn btn-ghost btn-full">⚙️ Configuración</a>
+          <button class="btn btn-danger btn-full" (click)="logout()">Cerrar sesión</button>
+        </div>
+      </div>
+    </div>
+  }
+</main>

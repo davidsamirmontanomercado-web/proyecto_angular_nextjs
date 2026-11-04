@@ -1,0 +1,95 @@
+import {
+  HttpContextToken,
+  HttpErrorResponse,
+  HttpInterceptorFn,
+} from '@angular/common/http';
+import { inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { catchError, from, switchMap, throwError } from 'rxjs';
+import { AuthService } from '../services/auth.service';
+
+/** Marca una petición ya reintentada tras renovar la sesión. */
+export const RETRIED_AFTER_REFRESH = new HttpContextToken<boolean>(() => false);
+
+/**
+ * Adjunta el access_token de la sesión a todas las llamadas al backend propio,
+ * de modo que las rutas /api/* protegidas vean auth.uid() real.
+ *
+ * Ante un 401 en una ruta de datos propia intenta renovar la sesión una sola
+ * vez (single-flight en AuthService.refresh) y reintenta la petición. El flag
+ * local `yaReintentado` garantiza un único reintento por petición (sin bucles).
+ * Los endpoints /api/auth/* quedan excluidos para no interpretar sus 401 como
+ * sesión expirada.
+ *
+ * Si la renovación falla, sólo se lleva al usuario a /login cuando la sesión
+ * quedó realmente inservible (AuthService.refresh ya limpió las credenciales).
+ * Ante un fallo transitorio se propaga el 401 sin cerrar sesión ni navegar, para
+ * no mostrar "sesión caducada" ni provocar redirecciones que el guard de /login
+ * revertiría (bucle).
+ */
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  // Excluimos solo los endpoints que son estrictamente para invitados o que 
+  // manejan su propia lógica de tokens (como refresh).
+  const endpointsInvitado = [
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/google',
+    '/api/auth/recuperar',
+    '/api/auth/restablecer',
+    '/api/auth/refresh',
+    '/api/auth/callback'
+  ];
+  
+  const esEndpointInvitado = endpointsInvitado.some(path => req.url.includes(path));
+  const esBackendPropio = req.url.startsWith(auth.backendUrl);
+  const token = auth.getToken();
+
+  const saliente =
+    !esEndpointInvitado && esBackendPropio && token
+      ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
+      : req;
+
+  let yaReintentado = req.context.get(RETRIED_AFTER_REFRESH);
+
+  return next(saliente).pipe(
+    catchError((err: HttpErrorResponse) => {
+      const puedeRenovar =
+        err.status === 401 &&
+        !esEndpointInvitado &&
+        esBackendPropio &&
+        !yaReintentado;
+
+      if (!puedeRenovar) {
+        return throwError(() => err);
+      }
+      yaReintentado = true;
+
+      return from(auth.refresh()).pipe(
+        switchMap((renovado) => {
+          if (!renovado) {
+            // `refresh()` limpia las credenciales cuando la sesión es
+            // irrecuperable; entonces el usuario ya no está autenticado y el
+            // guard de /login no vuelve a rebotarlo (sin bucle).
+            if (!auth.isLoggedIn()) {
+              router.navigateByUrl('/login');
+            }
+            return throwError(() => err);
+          }
+
+          const nuevoToken = auth.getToken();
+          const reintento = req.clone({
+            context: req.context.set(RETRIED_AFTER_REFRESH, true),
+            setHeaders: nuevoToken
+              ? { Authorization: `Bearer ${nuevoToken}` }
+              : {},
+          });
+
+          return next(reintento);
+        })
+      );
+    })
+  );
+};

@@ -1,0 +1,22 @@
+import { Routes } from '@angular/router';
+import { authGuard, guestGuard, adminGuard } from './services/auth.service';
+
+export const routes: Routes = [
+  { path: '', loadComponent: () => import('./pages/index/index').then(m => m.IndexComponent) },
+  { path: 'google-auth', loadComponent: () => import('./pages/google-auth/google-auth').then(m => m.default) },
+  { path: 'login', canActivate: [guestGuard], loadComponent: () => import('./pages/login/login').then(m => m.LoginComponent) },
+  { path: 'recuperar-contrasena', canActivate: [guestGuard], loadComponent: () => import('./pages/recuperar-contrasena/recuperar-contrasena').then(m => m.RecuperarContrasenaComponent) },
+  { path: 'restablecer-contrasena', canActivate: [guestGuard], loadComponent: () => import('./pages/restablecer-contrasena/restablecer-contrasena').then(m => m.RestablecerContrasenaComponent) },
+  { path: 'registro', canActivate: [guestGuard], loadComponent: () => import('./pages/registro/registro').then(m => m.RegistroComponent) },
+  { path: 'dashboard', canActivate: [authGuard], loadComponent: () => import('./pages/dashboard/dashboard').then(m => m.DashboardComponent) },
+  { path: 'envivos', loadComponent: () => import('./pages/envivos/envivos').then(m => m.EnvivosComponent) },
+  { path: 'live/:id', loadComponent: () => import('./pages/live/live').then(m => m.LiveComponent) },
+  { path: 'live', redirectTo: 'envivos', pathMatch: 'full' },
+  { path: 'crear-live', canActivate: [authGuard], loadComponent: () => import('./pages/crear-live/crear-live').then(m => m.CrearLiveComponent) },
+  { path: 'perfil', loadComponent: () => import('./pages/perfil/perfil').then(m => m.PerfilComponent) },
+  { path: 'comprar', loadComponent: () => import('./pages/comprar-productos/comprar-productos').then(m => m.ComprarProductosComponent) },
+  { path: 'categorias', loadComponent: () => import('./pages/categorias/categorias').then(m => m.CategoriasComponent) },
+  { path: 'configuracion', canActivate: [authGuard], loadComponent: () => import('./pages/configuracion/configuracion').then(m => m.ConfiguracionComponent) },
+  { path: 'admin/usuarios', canActivate: [adminGuard], loadComponent: () => import('./pages/admin-usuarios/admin-usuarios').then(m => m.AdminUsuariosComponent) },
+  { path: '**', redirectTo: '' }
+];

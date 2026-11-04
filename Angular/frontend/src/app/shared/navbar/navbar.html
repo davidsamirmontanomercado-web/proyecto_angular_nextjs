@@ -1,0 +1,126 @@
+<nav class="navbar" [class.scrolled]="scrolled">
+  <div class="nav-inner">
+    <a routerLink="/" class="brand" (click)="closeMenu()"><span class="brand-dot"></span>LiveMarket</a>
+
+    <ul class="nav-links">
+      @if (auth.isLoggedIn()) {
+        @if (auth.esAdminVista()) {
+          <li><a routerLink="/dashboard" routerLinkActive="active" class="nav-link">Panel</a></li>
+          <li><a routerLink="/admin/usuarios" routerLinkActive="active" class="nav-link">Usuarios</a></li>
+          <li><a routerLink="/envivos" routerLinkActive="active" class="nav-link">En Vivos</a></li>
+          <li><a routerLink="/categorias" routerLinkActive="active" class="nav-link">Categorías</a></li>
+        } @else if (auth.esVendedorVista()) {
+          <li><a routerLink="/dashboard" routerLinkActive="active" class="nav-link">Panel</a></li>
+          <li><a routerLink="/envivos" routerLinkActive="active" class="nav-link">En Vivos</a></li>
+          <li><a routerLink="/categorias" routerLinkActive="active" class="nav-link">Categorías</a></li>
+          <li><a routerLink="/comprar" routerLinkActive="active" class="nav-link">Tienda</a></li>
+        } @else {
+          <li><a routerLink="/envivos" routerLinkActive="active" class="nav-link">En Vivos</a></li>
+          <li><a routerLink="/categorias" routerLinkActive="active" class="nav-link">Categorías</a></li>
+          <li><a routerLink="/comprar" routerLinkActive="active" class="nav-link">Tienda</a></li>
+          <li><a routerLink="/dashboard" routerLinkActive="active" class="nav-link">Mis compras</a></li>
+        }
+      } @else {
+        <li><a routerLink="/envivos" routerLinkActive="active" class="nav-link">En Vivos</a></li>
+        <li><a routerLink="/categorias" routerLinkActive="active" class="nav-link">Categorías</a></li>
+        <li><a routerLink="/comprar" routerLinkActive="active" class="nav-link">Perfiles</a></li>
+      }
+      @if (auth.esAdmin() && !auth.esAdminVista()) {
+        <li><a routerLink="/admin/usuarios" routerLinkActive="active" class="nav-link">Admin</a></li>
+      }
+    </ul>
+
+    <div class="nav-actions">
+      @if (auth.isLoggedIn()) {
+        @if (auth.puedeAlternarVista()) {
+          <div class="vista-toggle" role="group" aria-label="Cambiar vista">
+            <button type="button" class="vista-btn" [class.active]="auth.esAdminVista()" (click)="auth.cambiarVista('administrador')">Admin</button>
+            <button type="button" class="vista-btn" [class.active]="auth.esVendedorVista()" (click)="auth.cambiarVista('vendedor')">Vendedor</button>
+            <button type="button" class="vista-btn" [class.active]="auth.esCompradorVista()" (click)="auth.cambiarVista('comprador')">Comprador</button>
+          </div>
+        }
+        @if (auth.esVendedorVista()) {
+          <a routerLink="/crear-live" class="btn btn-live btn-sm">🔴 Hacer en vivo</a>
+        }
+        <div class="user-chip" routerLink="/perfil">
+          <div class="user-avatar">{{ auth.initials(auth.currentUser()?.nombre) }}</div>
+          <div class="user-info">
+            <span class="user-name">{{ auth.currentUser()?.nombre }}</span>
+            <span class="rol-badge" [class.rol-vendedor]="auth.esVendedorVista()" [class.rol-admin]="auth.esAdminVista()">
+              {{ auth.etiquetaVista() }}
+            </span>
+          </div>
+        </div>
+        <button (click)="logout()" class="btn btn-logout-nav" title="Cerrar sesión">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        </button>
+      } @else {
+        <a routerLink="/login" class="btn btn-ghost btn-sm">Iniciar sesión</a>
+        <a routerLink="/registro" class="btn btn-primary btn-sm">Crear cuenta</a>
+      }
+    </div>
+
+    <button class="menu-btn" (click)="toggleMenu()" [class.open]="menuOpen" aria-label="Abrir menú">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+
+  <!-- Menú móvil desplegable -->
+  <div class="mobile-menu" [class.open]="menuOpen">
+    <ul class="mobile-links">
+      @if (auth.isLoggedIn()) {
+        @if (auth.esAdminVista()) {
+          <li><a routerLink="/dashboard" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Panel</a></li>
+          <li><a routerLink="/admin/usuarios" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Usuarios</a></li>
+          <li><a routerLink="/envivos" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">En Vivos</a></li>
+          <li><a routerLink="/categorias" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Categorías</a></li>
+        } @else if (auth.esVendedorVista()) {
+          <li><a routerLink="/dashboard" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Panel</a></li>
+          <li><a routerLink="/envivos" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">En Vivos</a></li>
+          <li><a routerLink="/categorias" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Categorías</a></li>
+          <li><a routerLink="/comprar" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Tienda</a></li>
+        } @else {
+          <li><a routerLink="/envivos" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">En Vivos</a></li>
+          <li><a routerLink="/categorias" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Categorías</a></li>
+          <li><a routerLink="/comprar" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Tienda</a></li>
+          <li><a routerLink="/dashboard" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Mis compras</a></li>
+        }
+      } @else {
+        <li><a routerLink="/envivos" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">En Vivos</a></li>
+        <li><a routerLink="/categorias" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Categorías</a></li>
+        <li><a routerLink="/comprar" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Perfiles</a></li>
+      }
+      @if (auth.esAdmin() && !auth.esAdminVista()) {
+        <li><a routerLink="/admin/usuarios" routerLinkActive="active" class="mobile-link" (click)="closeMenu()">Admin</a></li>
+      }
+    </ul>
+    <div class="mobile-actions">
+      @if (auth.isLoggedIn()) {
+        @if (auth.puedeAlternarVista()) {
+          <div class="vista-toggle vista-toggle-mobile" role="group" aria-label="Cambiar vista">
+            <button type="button" class="vista-btn" [class.active]="auth.esAdminVista()" (click)="auth.cambiarVista('administrador')">Admin</button>
+            <button type="button" class="vista-btn" [class.active]="auth.esVendedorVista()" (click)="auth.cambiarVista('vendedor')">Vendedor</button>
+            <button type="button" class="vista-btn" [class.active]="auth.esCompradorVista()" (click)="auth.cambiarVista('comprador')">Comprador</button>
+          </div>
+        }
+        @if (auth.esVendedorVista()) {
+          <a routerLink="/crear-live" class="btn btn-live" style="width:100%" (click)="closeMenu()">🔴 Hacer en vivo</a>
+        }
+        <div class="mobile-user" routerLink="/perfil" (click)="closeMenu()">
+          <div class="user-avatar" style="width:40px;height:40px;font-size:14px">{{ auth.initials(auth.currentUser()?.nombre) }}</div>
+          <div>
+            <div style="font-size:14px;font-weight:700">{{ auth.currentUser()?.nombre }}</div>
+            <div style="font-size:12px;color:var(--text-soft)">Ver mi perfil →</div>
+          </div>
+        </div>
+        <button (click)="logout()" class="btn btn-logout-mobile">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          Cerrar sesión
+        </button>
+      } @else {
+        <a routerLink="/login" class="btn btn-ghost" style="width:100%" (click)="closeMenu()">Iniciar sesión</a>
+        <a routerLink="/registro" class="btn btn-primary" style="width:100%" (click)="closeMenu()">Crear cuenta</a>
+      }
+    </div>
+  </div>
+</nav>
