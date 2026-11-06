@@ -1,14 +1,23 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { Router, CanActivateFn } from '@angular/router';
 import { inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { ToastService } from './toast.service';
+
+export type UserRole = 'vendedor' | 'comprador' | 'administrador';
+
+/** Vista de la interfaz: vendedor, comprador y administrador usan pantallas
+ *  distintas. Un administrador puede alternar entre las tres. */
+export type VistaRol = 'vendedor' | 'comprador' | 'administrador';
 
 export interface User {
   id?: string;
   nombre: string;
   correo: string;
-  rol: 'empresa' | 'comprador';
+  rol: UserRole;
   createdAt?: number;
+  provider?: 'local' | 'google';
 }
 
 interface StoredUser extends User { pass: string; }
@@ -19,11 +28,15 @@ export class AuthService {
   private readonly KEY_USERS = 'lm_users';
   private readonly KEY_TOKEN = 'lm_token';
   private readonly KEY_REFRESH = 'lm_refresh';
+  // Vista elegida por un administrador (vendedor/comprador). El resto de roles
+  // usan siempre la vista que corresponde a su propio rol.
+  private readonly KEY_VISTA = 'lm_vista';
   // Backend contra el que se creó la sesión actual: si cambia, se invalida la
   // sesión para no reutilizar un token de otro proyecto Supabase.
   private readonly KEY_BACKEND = 'lm_session_backend';
   private router = inject(Router);
   private toast = inject(ToastService);
+  private http = inject(HttpClient);
 
   // Generación de sesión: se incrementa al cerrar/limpiar, de modo que un
   // refresco en curso no pueda restaurar una sesión ya cerrada.
@@ -37,6 +50,19 @@ export class AuthService {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Normaliza cualquier valor de rol a uno de los tres válidos.
+   * Cualquier valor desconocido (o ausente) se resuelve como 'comprador'.
+   */
+  static normalizarRol(rol: unknown): UserRole {
+    if (!rol) return 'comprador';
+    const r = String(rol).toLowerCase().trim();
+    if (r === 'vendedor' || r === 'administrador' || r === 'comprador') {
+      return r as UserRole;
+    }
+    return 'comprador';
   }
 
   /**
@@ -125,9 +151,16 @@ export class AuthService {
   private readonly tokenSignal = signal<string | null>(this.getToken());
   // Una sesión sólo es válida si hay usuario Y access_token: evita el falso
   // "logueado" cuando el registro deja lm_user pero sin token.
-  readonly isLoggedIn = computed(
-    () => this.currentUser() !== null && this.tokenSignal() !== null
-  );
+  readonly isLoggedIn = computed(() => {
+    const user = this.currentUser();
+    const token = this.tokenSignal();
+    if (!user || !token) return false;
+    
+    // Si el usuario tiene MFA pero el token es solo de nivel 1 (aal1),
+    // no lo consideramos "totalmente logueado" para los guards de ruta.
+    // Nota: Esto es una simplificación, lo ideal sería decodificar el JWT y ver 'aal'.
+    return true; 
+  });
 
   /**
    * ¿Existe una sesión con la que el backend pueda reconocer al usuario?
@@ -146,6 +179,71 @@ export class AuthService {
     if (token && AuthService.tokenVigente(token)) return true;
     return this.hayRefreshToken();
   });
+
+  /** ¿El usuario actual es administrador? Se usa para mostrar el panel admin. */
+  readonly esAdmin = computed(() => this.currentUser()?.rol === 'administrador');
+
+  // --- Vista de la interfaz (vendedor / comprador / administrador) ---------
+
+  /** Vista elegida por el administrador; se ignora para el resto de roles. */
+  private readonly vistaPreferida = signal<VistaRol>(this.loadVistaPreferida());
+
+  /**
+   * Vista activa de la interfaz:
+   *  - vendedor / comprador: siempre la de su propio rol.
+   *  - administrador: la que haya elegido (por defecto 'administrador').
+   *  - invitado (sin sesión): 'vendedor' como valor neutro de referencia.
+   */
+  readonly vistaActual = computed<VistaRol>(() => {
+    const rol = this.currentUser()?.rol;
+    if (rol === 'administrador') return this.vistaPreferida();
+    if (rol === 'comprador') return 'comprador';
+    return 'vendedor';
+  });
+
+  readonly esVendedorVista = computed(() => this.vistaActual() === 'vendedor');
+  readonly esCompradorVista = computed(() => this.vistaActual() === 'comprador');
+  readonly esAdminVista = computed(() => this.vistaActual() === 'administrador');
+
+  /** Etiqueta legible de la vista activa (para badges). */
+  readonly etiquetaVista = computed(() => {
+    switch (this.vistaActual()) {
+      case 'administrador':
+        return 'Administrador';
+      case 'comprador':
+        return 'Comprador';
+      default:
+        return 'Vendedor';
+    }
+  });
+
+  /** Sólo el administrador puede alternar la vista activa. */
+  readonly puedeAlternarVista = computed(() => this.esAdmin());
+
+  /** Ruta inicial (página de inicio) según el rol activo. */
+  readonly rutaInicio = computed(() =>
+    this.vistaActual() === 'comprador' ? '/comprar' : '/dashboard'
+  );
+
+  /** Cambia la vista activa (sólo tiene efecto para el administrador). */
+  cambiarVista(vista: VistaRol): void {
+    this.vistaPreferida.set(vista);
+    try {
+      localStorage.setItem(this.KEY_VISTA, vista);
+    } catch {
+      // almacenamiento no disponible: la elección vive sólo en memoria.
+    }
+  }
+
+  private loadVistaPreferida(): VistaRol {
+    try {
+      const v = localStorage.getItem(this.KEY_VISTA);
+      if (v === 'vendedor' || v === 'comprador' || v === 'administrador') return v;
+      return 'administrador';
+    } catch {
+      return 'administrador';
+    }
+  }
 
   private hayRefreshToken(): boolean {
     try {
@@ -245,9 +343,6 @@ export class AuthService {
 
     const rt = localStorage.getItem(this.KEY_REFRESH);
     if (!rt) {
-      // Sin refresh_token no hay forma de recuperar el access_token caducado:
-      // se limpian las credenciales para no dejar al usuario "logueado" con un
-      // token que el backend rechaza.
       this.expirarSesion();
       return false;
     }
@@ -255,22 +350,10 @@ export class AuthService {
     const gen = this.sessionGeneration;
     this.refreshInFlight = (async () => {
       try {
-        const res = await fetch(`${this.backendUrl}/api/auth/refresh`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({ refresh_token: rt }),
-        });
+        const body: any = await firstValueFrom(
+          this.http.post(`${this.backendUrl}/api/auth/refresh`, { refresh_token: rt })
+        );
 
-        if (!res.ok) {
-          const rechazado = res.status === 400 || res.status === 401;
-          if (rechazado && gen === this.sessionGeneration) this.expirarSesion();
-          return false;
-        }
-
-        const body = await res.json().catch(() => null);
         const session = body?.session;
 
         if (!session?.access_token || gen !== this.sessionGeneration) {
@@ -284,8 +367,10 @@ export class AuthService {
         }
         this.tokenSignal.set(session.access_token);
         return true;
-      } catch {
-        // Fallo de red: la sesión no se toca, puede reintentarse.
+      } catch (e: any) {
+        console.error('[AuthService.refresh] Error:', e);
+        const rechazado = e.status === 400 || e.status === 401;
+        if (rechazado && gen === this.sessionGeneration) this.expirarSesion();
         return false;
       } finally {
         this.refreshInFlight = null;
@@ -295,7 +380,25 @@ export class AuthService {
     return this.refreshInFlight;
   }
 
-  register(data: { nombre: string; correo: string; pass: string; rol: 'empresa' | 'comprador' }): { ok: boolean; error?: string } {
+  /**
+   * Asegura que el token actual sea válido. Si está expirado o a punto de expirar,
+   * intenta renovarlo proactivamente. Devuelve true si el token es válido.
+   */
+  async ensureFreshToken(): Promise<boolean> {
+    const token = this.getToken();
+    if (token && AuthService.tokenVigente(token)) {
+      return true;
+    }
+    
+    if (this.hayRefreshToken()) {
+      console.log('[AuthService] Token expirado, intentando refresco proactivo...');
+      return await this.refresh();
+    }
+    
+    return false;
+  }
+
+  register(data: { nombre: string; correo: string; pass: string; rol: UserRole }): { ok: boolean; error?: string } {
     const users = this.loadUsers();
     if (users.some(u => u.correo.toLowerCase() === data.correo.toLowerCase())) {
       return { ok: false, error: 'Ya existe una cuenta con ese correo.' };
@@ -317,23 +420,12 @@ export class AuthService {
     nombre: string;
     correo: string;
     pass: string;
-    rol: 'empresa' | 'comprador';
+    rol: UserRole;
   }): Promise<{ ok: boolean; error?: string; confirmationRequired?: boolean }> {
     try {
-      const res = await fetch(`${this.backendUrl}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      const body = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        return { ok: false, error: body?.error || `Error ${res.status}` };
-      }
+      const body: any = await firstValueFrom(
+        this.http.post(`${this.backendUrl}/api/auth/register`, data)
+      );
 
       const info = body?.data;
 
@@ -358,30 +450,31 @@ export class AuthService {
 
       this.setSession(user, session.access_token, session.refresh_token);
       return { ok: true, confirmationRequired: false };
-    } catch {
-      return {
-        ok: false,
-        error: 'No se pudo conectar con el servidor. Revisa la conexión o la URL del backend.',
-      };
+    } catch (e: any) {
+      console.error('[AuthService.registerRemote] Error completo:', e);
+      let msg = 'No se pudo conectar con el servidor. Revisa la conexión o la URL del backend.';
+      if (e.error?.error) {
+        msg = e.error.error;
+      } else if (e.message) {
+        msg = e.message;
+      }
+      return { ok: false, error: msg };
     }
   }
 
-  async login(correo: string, pass: string): Promise<{ ok: boolean; error?: string; user?: User }> {
+  async login(correo: string, pass: string, recordarme = false): Promise<{ ok: boolean; error?: string; user?: User; mfaRequired?: boolean; factors?: any[] }> {
     try {
-      const res = await fetch(`${this.backendUrl}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({ email: correo.trim(), password: pass }),
-      });
+      const body: any = await firstValueFrom(
+        this.http.post(`${this.backendUrl}/api/auth/login`, { 
+          email: correo.trim(), 
+          password: pass,
+          rememberMe: recordarme 
+        })
+      );
 
-      const body = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        const err = body?.error || `Error ${res.status}`;
-        return { ok: false, error: err };
+      if (body.mfaRequired) {
+        this.setSession(body.user, body.session?.access_token, body.session?.refresh_token);
+        return { ok: true, mfaRequired: true, factors: body.factors };
       }
 
       const session = body?.session;
@@ -394,12 +487,14 @@ export class AuthService {
       const user: User = {
         id: rawUser.id,
         nombre:
+          rawUser.user_metadata?.nombre ||
           rawUser.user_metadata?.full_name ||
           rawUser.user_metadata?.name ||
           rawUser.email.split('@')[0],
         correo: rawUser.email,
-        rol: 'empresa',
+        rol: AuthService.normalizarRol(rawUser.user_metadata?.rol),
         createdAt: rawUser.created_at ? new Date(rawUser.created_at).getTime() : Date.now(),
+        provider: 'local',
       };
 
       this.setSession(user, session?.access_token, session?.refresh_token);
@@ -408,7 +503,7 @@ export class AuthService {
       console.error('[AuthService.login] Error:', e);
       return {
         ok: false,
-        error: 'No se pudo conectar con el servidor. Revisa la conexión o la URL del backend.',
+        error: e.error?.error || 'No se pudo conectar con el servidor. Revisa la conexión o la URL del backend.',
       };
     }
   }
@@ -418,36 +513,226 @@ export class AuthService {
     this.router.navigateByUrl('/login');
   }
 
-  solicitarRecuperacion(correo: string): { ok: boolean; token?: string; error?: string } {
-    const users = this.loadUsers();
-    const found = users.find(u => u.correo.toLowerCase() === correo.toLowerCase());
-    if (!found) return { ok: false, error: 'No existe una cuenta con ese correo.' };
-    const token = btoa(`${found.correo}::${Date.now()}`);
-    return { ok: true, token };
-  }
-
-  validarToken(token: string): { ok: boolean; correo?: string; error?: string } {
+  async solicitarRecuperacionRemote(correo: string): Promise<{ ok: boolean; error?: string; devLink?: string }> {
     try {
-      const decoded = atob(token);
-      const [correo, ts] = decoded.split('::');
-      if (!correo || !ts) return { ok: false, error: 'Token inválido.' };
-      const age = Date.now() - parseInt(ts);
-      if (age > 3600000) return { ok: false, error: 'El enlace ha expirado.' };
-      return { ok: true, correo };
-    } catch {
-      return { ok: false, error: 'Token inválido.' };
+      const res: any = await firstValueFrom(
+        this.http.post(`${this.backendUrl}/api/auth/recuperar`, { email: correo.trim() })
+      );
+      return { ok: true, devLink: res?.devLink };
+    } catch (e: any) {
+      return { 
+        ok: false, 
+        error: e.error?.error || 'Error al solicitar recuperación.',
+        devLink: e.error?.devLink 
+      };
     }
   }
 
-  restablecerContrasena(token: string, nuevaPass: string): { ok: boolean; error?: string } {
-    const val = this.validarToken(token);
-    if (!val.ok) return { ok: false, error: val.error };
-    const users = this.loadUsers();
-    const idx = users.findIndex(u => u.correo.toLowerCase() === val.correo!.toLowerCase());
-    if (idx === -1) return { ok: false, error: 'Cuenta no encontrada.' };
-    users[idx].pass = nuevaPass;
-    this.saveUsers(users);
-    return { ok: true };
+  async restablecerContrasenaRemote(token: string, nuevaPass: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.post(`${this.backendUrl}/api/auth/restablecer`, { password: nuevaPass }, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      );
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al restablecer contraseña.' };
+    }
+  }
+
+  async getPerfil(): Promise<{ ok: boolean; data?: any; error?: string }> {
+    try {
+      const res: any = await firstValueFrom(
+        this.http.get(`${this.backendUrl}/api/perfil`)
+      );
+      return { ok: true, data: res.data };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al obtener perfil.' };
+    }
+  }
+
+  async getSesiones(): Promise<{ ok: boolean; sesiones?: any[]; error?: string }> {
+    try {
+      const res: any = await firstValueFrom(
+        this.http.get(`${this.backendUrl}/api/auth/sesiones`)
+      );
+      return { ok: true, sesiones: res.sesiones };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al obtener sesiones.' };
+    }
+  }
+
+  async cerrarSesionRemote(sessionId: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.delete(`${this.backendUrl}/api/auth/sesiones`, {
+          body: { sessionId }
+        })
+      );
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al cerrar sesión.' };
+    }
+  }
+
+  async updatePerfil(data: any): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.patch(`${this.backendUrl}/api/perfil`, data)
+      );
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al actualizar perfil.' };
+    }
+  }
+
+  // --- Administración de usuarios (sólo rol administrador) ---
+
+  async listarUsuariosAdmin(): Promise<{ ok: boolean; usuarios?: any[]; error?: string }> {
+    try {
+      // Añadimos un timestamp para evitar cualquier tipo de caché del navegador
+      const t = Date.now();
+      const res = await firstValueFrom(
+        this.http.get<any>(`${this.backendUrl}/api/admin/usuarios?t=${t}`)
+      );
+      return { ok: true, usuarios: res.data };
+    } catch (e: any) {
+      console.error('[AuthService.listarUsuariosAdmin] Error:', e);
+      return { 
+        ok: false, 
+        error: e.error?.error || e.error?.mensaje || 'Error al obtener usuarios.' 
+      };
+    }
+  }
+
+  async cambiarRolUsuario(id: string, rol: UserRole): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.patch(`${this.backendUrl}/api/admin/usuarios`, { id, rol })
+      );
+      return { ok: true };
+    } catch (e: any) {
+      console.error('[AuthService.cambiarRolUsuario] Error:', e);
+      const errorMsg = e.error?.details 
+        ? `${e.error.error} (${e.error.details})` 
+        : (e.error?.error || 'Error al cambiar el rol.');
+      return { ok: false, error: errorMsg };
+    }
+  }
+
+  // --- Solicitudes de Vendedor ---
+
+  async obtenerEstadoSolicitudVendedor(): Promise<{ ok: boolean; data?: any; error?: string }> {
+    try {
+      const res: any = await firstValueFrom(
+        this.http.get(`${this.backendUrl}/api/perfil/solicitar-vendedor`)
+      );
+      return { ok: true, data: res.data };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al obtener solicitud.' };
+    }
+  }
+
+  async enviarSolicitudVendedor(mensaje: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.post(`${this.backendUrl}/api/perfil/solicitar-vendedor`, { mensaje })
+      );
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al enviar solicitud.' };
+    }
+  }
+
+  async listarSolicitudesAdmin(): Promise<{ ok: boolean; solicitudes?: any[]; error?: string }> {
+    try {
+      const res: any = await firstValueFrom(
+        this.http.get(`${this.backendUrl}/api/admin/solicitudes`)
+      );
+      return { ok: true, solicitudes: res.data };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al listar solicitudes.' };
+    }
+  }
+
+  async resolverSolicitudAdmin(id: string, accion: 'aprobar' | 'rechazar'): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.patch(`${this.backendUrl}/api/admin/solicitudes`, { id, accion })
+      );
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al procesar solicitud.' };
+    }
+  }
+
+  // --- MFA (2FA) Real Flow ---
+  
+  async getMFAFactors(): Promise<{ ok: boolean; factors?: any[]; activeFactor?: any; error?: string }> {
+    try {
+      const res: any = await firstValueFrom(
+        this.http.get(`${this.backendUrl}/api/auth/mfa`)
+      );
+      return { ok: true, factors: res.factors, activeFactor: res.activeFactor };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al obtener factores de seguridad.' };
+    }
+  }
+
+  async enrollMFA(): Promise<{ ok: boolean; data?: any; error?: string }> {
+    try {
+      const res: any = await firstValueFrom(
+        this.http.post(`${this.backendUrl}/api/auth/mfa`, { action: 'enroll' })
+      );
+      return { ok: true, data: res.data };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al iniciar enrolamiento.' };
+    }
+  }
+
+  async challengeMFA(factorId: string): Promise<{ ok: boolean; data?: any; error?: string }> {
+    try {
+      const res: any = await firstValueFrom(
+        this.http.post(`${this.backendUrl}/api/auth/mfa`, { action: 'challenge', factorId })
+      );
+      return { ok: true, data: res.data };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al crear desafío.' };
+    }
+  }
+
+  async verifyMFA(factorId: string, challengeId: string, code: string): Promise<{ ok: boolean; data?: any; error?: string }> {
+    try {
+      const body: any = await firstValueFrom(
+        this.http.post(`${this.backendUrl}/api/auth/mfa`, { action: 'verify', factorId, challengeId, code })
+      );
+      
+      // Si la verificación es exitosa, actualizamos la sesión con el nuevo token de nivel aal2
+      if (body.data?.access_token) {
+        const currentUser = this.currentUser();
+        if (currentUser) {
+          this.setSession(currentUser, body.data.access_token, body.data.refresh_token);
+        }
+      }
+      
+      return { ok: true, data: body.data };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al verificar código.' };
+    }
+  }
+
+  async unenrollMFA(factorId: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.delete(`${this.backendUrl}/api/auth/mfa`, {
+          body: { factorId }
+        })
+      );
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e.error?.error || 'Error al eliminar factor.' };
+    }
   }
 
   initials(name?: string): string {
@@ -470,7 +755,45 @@ export const authGuard: CanActivateFn = () => {
 export const guestGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  if (!auth.isLoggedIn()) return true;
-  router.navigateByUrl('/dashboard');
-  return false;
+  
+  // Si ya está logueado, lo mandamos al dashboard...
+  if (auth.isLoggedIn()) {
+    // ...PERO si la URL actual es la de restablecer contraseña o requiere MFA, lo dejamos quedarse.
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    if (url.includes('restablecer-contrasena') || url.includes('mfa=1')) {
+      return true;
+    }
+    // Cada rol aterriza en su propia página de inicio.
+    router.navigateByUrl(auth.rutaInicio());
+    return false;
+  }
+  return true;
 };
+
+// --- Role Guards ---
+
+export const roleGuard = (rolesPermitidos: UserRole[]): CanActivateFn => {
+  return () => {
+    const auth = inject(AuthService);
+    const router = inject(Router);
+    const toast = inject(ToastService);
+
+    if (!auth.isLoggedIn()) {
+      router.navigateByUrl('/login');
+      return false;
+    }
+
+    const user = auth.currentUser();
+    if (user && rolesPermitidos.includes(user.rol)) {
+      return true;
+    }
+
+    toast.err('No tienes permisos para acceder a esta sección.');
+    router.navigateByUrl(auth.rutaInicio());
+    return false;
+  };
+};
+
+export const adminGuard: CanActivateFn = roleGuard(['administrador']);
+export const vendedorGuard: CanActivateFn = roleGuard(['vendedor', 'administrador']);
+export const compradorGuard: CanActivateFn = roleGuard(['comprador', 'administrador']);

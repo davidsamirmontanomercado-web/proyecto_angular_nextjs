@@ -31,12 +31,24 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
-  const esEndpointAuth = req.url.includes('/api/auth/');
+  // Excluimos solo los endpoints que son estrictamente para invitados o que 
+  // manejan su propia lógica de tokens (como refresh).
+  const endpointsInvitado = [
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/google',
+    '/api/auth/recuperar',
+    '/api/auth/restablecer',
+    '/api/auth/refresh',
+    '/api/auth/callback'
+  ];
+  
+  const esEndpointInvitado = endpointsInvitado.some(path => req.url.includes(path));
   const esBackendPropio = req.url.startsWith(auth.backendUrl);
   const token = auth.getToken();
 
   const saliente =
-    !esEndpointAuth && esBackendPropio && token
+    !esEndpointInvitado && esBackendPropio && token
       ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
       : req;
 
@@ -46,7 +58,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((err: HttpErrorResponse) => {
       const puedeRenovar =
         err.status === 401 &&
-        !esEndpointAuth &&
+        !esEndpointInvitado &&
         esBackendPropio &&
         !yaReintentado;
 

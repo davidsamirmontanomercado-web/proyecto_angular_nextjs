@@ -1,129 +1,588 @@
 <app-navbar></app-navbar>
 
 <main class="container page-top" style="padding-bottom:60px">
-  <div class="profile-hero">
-    <div class="profile-cover"></div>
-    <div class="profile-body">
-      <div class="profile-avatar">{{ initials }}</div>
-      <div class="profile-meta">
-        <div class="profile-name">
-          {{ nombre }} <span class="verified">✓ Verificada</span>
+  @if (cargando()) {
+    <div class="loading-state">
+      <div class="spinner-premium"></div>
+      <p>Cargando tu experiencia personalizada...</p>
+    </div>
+  } @else if (error()) {
+    <div class="error-state panel">
+      <span class="error-ic">⚠️</span>
+      <p>{{ error() }}</p>
+      <button class="btn btn-premium mt-4" (click)="cargarPerfil()">Reintentar conexión</button>
+    </div>
+  } @else if (perfil()) {
+    
+    <!-- Hero Universal Premium -->
+    <div class="profile-hero fade-in">
+      <div class="profile-cover"></div>
+      <div class="profile-body-pro">
+        <div class="profile-avatar-container">
+          <div class="profile-avatar">{{ initials }}</div>
+          @if (auth.esVendedorVista()) {
+            <div class="online-status-badge">ONLINE</div>
+          }
         </div>
-        <div class="profile-stats">
-          <span>⭐ 4.8</span>
-          <span>📍 Barranquilla</span>
-          <span>🏭 Fabricante</span>
-          <span>👥 1.2K seguidores</span>
+        
+        <div class="profile-meta-pro">
+          <h1 class="profile-name">
+            {{ nombreDisplay }}
+            @if (auth.esVendedorVista()) {
+              <span class="verified-badge">✓ Negocio Verificado</span>
+            } @else if (auth.esAdminVista()) {
+              <span class="admin-badge-pro">🛡️ Staff Sistema</span>
+            }
+          </h1>
+          <p class="profile-email-pro">{{ perfil()?.usuario?.correo }}</p>
+        </div>
+
+        <div class="profile-actions-pro">
+          <a routerLink="/configuracion" class="btn btn-premium-outline">
+            <span class="ic">⚙️</span> Configurar
+          </a>
         </div>
       </div>
-      <a routerLink="/configuracion" class="btn btn-primary btn-sm">Editar perfil</a>
     </div>
-  </div>
 
-  <div class="tabs" style="display:inline-flex">
-    <button class="tab active">Productos</button>
-    <button class="tab">En vivos</button>
-    <button class="tab">Información</button>
-  </div>
+    <!-- VISTA VENDEDOR: Storefront Experience -->
+    @if (auth.esVendedorVista()) {
+      <div class="seller-experience fade-in">
+        <div class="seller-kpis">
+          <div class="kpi-card-premium">
+            <div class="kpi-val">⭐ 4.9</div>
+            <div class="kpi-lab">Reputación</div>
+          </div>
+          <div class="kpi-card-premium">
+            <div class="kpi-val">{{ perfil()?.stats?.seguidores || 0 }}</div>
+            <div class="kpi-lab">Seguidores</div>
+          </div>
+          <div class="kpi-card-premium">
+            <div class="kpi-val">128</div>
+            <div class="kpi-lab">Ventas Totales</div>
+          </div>
+          <div class="kpi-card-premium">
+            <div class="kpi-val">98%</div>
+            <div class="kpi-lab">Tasa Respuesta</div>
+          </div>
+        </div>
 
-  <div class="live-now">
-    <div class="live-now-left">
-      <div class="live-dot"></div>
-      <div>
-        <h4>EN VIVO AHORA · Lanzamiento colección 2025</h4>
-        <p>1.2K espectadores · Empezó hace 12 minutos</p>
-      </div>
-    </div>
-    <a routerLink="/envivos" class="btn btn-primary btn-sm">Ver transmisión →</a>
-  </div>
+        <div class="pro-layout-grid">
+          <div class="panel business-info-pro">
+            <div class="panel-header-pro">
+              <h3>Perfil del Negocio</h3>
+              <span class="category-tag">{{ perfil()?.perfilEmpresa?.categoria_negocio || 'Comercio' }}</span>
+            </div>
+            
+            <div class="info-list-pro">
+              <div class="info-item-pro">
+                <span class="ic">📍</span>
+                <div class="det">
+                  <label>Sede Principal</label>
+                  <p>{{ perfil()?.perfilEmpresa?.ubicacion || 'No definida' }}</p>
+                </div>
+              </div>
+              <div class="info-item-pro">
+                <span class="ic">📞</span>
+                <div class="det">
+                  <label>Línea de Atención</label>
+                  <p>{{ perfil()?.perfilEmpresa?.telefono_contacto || 'No disponible' }}</p>
+                </div>
+              </div>
+              <div class="info-item-pro">
+                <span class="ic">📧</span>
+                <div class="det">
+                  <label>Correo Corporativo</label>
+                  <p>{{ perfil()?.perfilEmpresa?.correo_contacto || perfil()?.usuario?.correo }}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="about-section-pro mt-8">
+              <label>Nuestra Historia</label>
+              <p>{{ perfil()?.perfilEmpresa?.descripcion || 'Bienvenido a nuestra tienda oficial en LiveMarket. Ofrecemos calidad y confianza.' }}</p>
+            </div>
+          </div>
 
-  <h3 style="font-size:19px;font-weight:800;letter-spacing:-.5px;margin:28px 0 18px">Catálogo de productos</h3>
+          <div class="side-controls">
+            <div class="panel live-control-card">
+              <div class="live-status-header">
+                <div class="status-dot-pulse"></div>
+                <span>LISTO PARA TRANSMITIR</span>
+              </div>
+              <h4>Tu canal está listo</h4>
+              <p>Inicia un en vivo para conectar con tus seguidores ahora.</p>
+              <button class="btn btn-premium w-full mt-6">Iniciar Live Stream</button>
+            </div>
 
-  <div class="grid-3">
-    <div class="live-card">
-      <div class="live-thumb" style="background:linear-gradient(135deg,#ececec,#c8c8d0)"></div>
-      <div class="live-body">
-        <div class="live-cat">Muebles de oficina</div>
-        <div class="live-title">Escritorio ejecutivo en madera</div>
-        <div class="live-desc">$1.200.000 · Entrega inmediata</div>
-      </div>
-    </div>
-    <div class="live-card">
-      <div class="live-thumb" style="background:linear-gradient(135deg,#ececec,#c8c8d0)"></div>
-      <div class="live-body">
-        <div class="live-cat">Muebles de oficina</div>
-        <div class="live-title">Silla ergonómica premium</div>
-        <div class="live-desc">$650.000 · 5 años de garantía</div>
-      </div>
-    </div>
-    <div class="live-card">
-      <div class="live-thumb" style="background:linear-gradient(135deg,#ececec,#c8c8d0)"></div>
-      <div class="live-body">
-        <div class="live-cat">Muebles comerciales</div>
-        <div class="live-title">Vitrina exhibidora de vidrio</div>
-        <div class="live-desc">$890.000 · Fabricación a medida</div>
-      </div>
-    </div>
-  </div>
+            <div class="panel stats-mini mt-6">
+              <h4>Rendimiento Hoy</h4>
+              <div class="mini-stat-row">
+                <span>Visitas perfil</span>
+                <strong>452</strong>
+              </div>
+              <div class="mini-stat-row">
+                <span>Clics en productos</span>
+                <strong>84</strong>
+              </div>
+            </div>
+          </div>
+        </div>
 
-  <h3 style="font-size:19px;font-weight:800;letter-spacing:-.5px;margin:40px 0 18px">Información del negocio</h3>
+        <div class="catalog-header-pro mt-12">
+          <h2>Gestionar Pedidos</h2>
+          <span class="badge-count">{{ pedidos().length }} Recibidos</span>
+        </div>
 
-  <div class="info-grid">
-    <div class="info-card">
-      <div class="info-ic">📞</div>
-      <div class="info-body">
-        <div class="info-label">Teléfono</div>
-        <div class="info-value">+57 300 123 4567</div>
-      </div>
-    </div>
-    <div class="info-card">
-      <div class="info-ic">📧</div>
-      <div class="info-body">
-        <div class="info-label">Correo</div>
-        <div class="info-value">ventas@mueblescaribe.com</div>
-      </div>
-    </div>
-    <div class="info-card">
-      <div class="info-ic">📍</div>
-      <div class="info-body">
-        <div class="info-label">Ubicación</div>
-        <div class="info-value">Barranquilla, Atlántico</div>
-      </div>
-    </div>
-    <div class="info-card">
-      <div class="info-ic">🕐</div>
-      <div class="info-body">
-        <div class="info-label">Horario</div>
-        <div class="info-value">Lun - Vie · 8am a 6pm</div>
-      </div>
-    </div>
-    <div class="info-card">
-      <div class="info-ic">🚚</div>
-      <div class="info-body">
-        <div class="info-label">Envíos</div>
-        <div class="info-value">A todo el país · Gratis +$500k</div>
-      </div>
-    </div>
-    <div class="info-card">
-      <div class="info-ic">💳</div>
-      <div class="info-body">
-        <div class="info-label">Pagos</div>
-        <div class="info-value">Efectivo · Transferencia · TC</div>
-      </div>
-    </div>
-  </div>
+        <div class="orders-filter-bar">
+          @for (est of estados; track est.valor) {
+            <button
+              type="button"
+              class="chip-filter"
+              [class.active]="filtroEstado() === est.valor"
+              (click)="filtroEstado.set(est.valor)">
+              {{ est.etiqueta }}
+            </button>
+          }
+        </div>
 
-  <h3 style="font-size:19px;font-weight:800;letter-spacing:-.5px;margin:40px 0 18px">Sobre nosotros</h3>
-  <div class="about-card">
-    <p style="font-size:14px;color:var(--text-soft);line-height:1.7;margin:0 0 14px">
-      Fabricamos muebles de alta calidad con más de 15 años de experiencia en el mercado.
-      Nuestra pasión es crear espacios funcionales y elegantes para tu oficina, hogar o negocio.
-    </p>
-    <p style="font-size:14px;color:var(--text-soft);line-height:1.7;margin:0">
-      ✔ Más de 5.000 clientes satisfechos en toda la Costa Caribe · ✔ Garantía extendida en todos nuestros productos ·
-      ✔ Diseño personalizado y fabricación a medida según tus necesidades.
-    </p>
-  </div>
+        @if (cargandoPedidos()) {
+          <div class="loading-mini"><div class="spinner-premium sm"></div></div>
+        } @else if (pedidosFiltrados.length === 0) {
+          <div class="empty-state-premium">
+            <div class="empty-art">📦</div>
+            <h3>{{ filtroEstado() === 'todos' ? 'No tienes pedidos aún' : 'Sin pedidos en este estado' }}</h3>
+            <p>Tus ventas aparecerán aquí cuando los clientes compren tus productos.</p>
+          </div>
+        } @else {
+          <div class="orders-grid-pro mt-6">
+            @for (pedido of pedidosFiltrados; track pedido.id) {
+              <div class="order-card-pro">
+                <div class="order-header">
+                  <div class="order-id">#{{ pedido.id }}</div>
+                  <div class="order-status" [style.background]="getEstadoColor(pedido.estado)">
+                    {{ etiquetaEstado(pedido.estado) | uppercase }}
+                  </div>
+                </div>
+                
+                <div class="order-body">
+                  <div class="client-info">
+                    <label>Cliente</label>
+                    <p>{{ pedido.comprador?.nombre }}</p>
+                    <span class="email">{{ pedido.comprador?.correo }}</span>
+                  </div>
+
+                  <div class="delivery-info">
+                    <label>Entrega en</label>
+                    <p>{{ pedido.municipio }}, {{ pedido.ciudad }}</p>
+                    <p class="dir">{{ pedido.direccion }}</p>
+                  </div>
+
+                  <div class="order-items-summary">
+                    <label>Items ({{ pedido.items?.length }})</label>
+                    <div class="items-preview">
+                      @for (item of pedido.items; track item.id) {
+                        <div class="mini-item">
+                          <span>{{ item.cantidad }}x {{ item.producto?.nombre }}</span>
+                          <strong>{{ (item.precio_unitario * item.cantidad) | currency:'USD':'symbol':'1.0-0' }}</strong>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                <div class="order-footer">
+                  <div class="order-total">
+                    <label>Total a recibir</label>
+                    <strong>{{ pedido.total | currency:'USD':'symbol':'1.0-0' }}</strong>
+                  </div>
+                  
+                  <div class="order-actions">
+                    @if (pedido.estado === 'pendiente') {
+                      <button class="btn-sm btn-premium" (click)="actualizarEstadoPedido(pedido.id, 'confirmado')">Confirmar</button>
+                      <button class="btn-sm btn-ghost" (click)="actualizarEstadoPedido(pedido.id, 'cancelado')">Rechazar</button>
+                    } @else if (pedido.estado === 'confirmado') {
+                      <button class="btn-sm btn-premium" (click)="actualizarEstadoPedido(pedido.id, 'enviado')">Marcar Enviado</button>
+                    } @else if (pedido.estado === 'enviado') {
+                      <button class="btn-sm btn-premium" (click)="actualizarEstadoPedido(pedido.id, 'entregado')">Marcar Entregado</button>
+                    }
+                    <button class="btn-sm btn-ghost" (click)="abrirDetalle(pedido)">Detalle</button>
+                    @if (puedeEliminar(pedido)) {
+                      <button class="btn-sm btn-danger-ghost" (click)="pedirEliminar(pedido)" title="Eliminar pedido">🗑️</button>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <div class="catalog-header-pro mt-12">
+          <h2>Catálogo Destacado</h2>
+          <a routerLink="/vendedor/productos" class="link-pro-btn">Gestionar Todo →</a>
+        </div>
+        
+        <div class="empty-state-premium">
+          <div class="empty-art">🛍️</div>
+          <h3>Tu vitrina está vacía</h3>
+          <p>Sube tus mejores productos para que tus clientes puedan comprarlos durante tus transmisiones.</p>
+          <button class="btn btn-premium">Subir Primer Producto</button>
+        </div>
+      </div>
+    }
+
+    <!-- VISTA COMPRADOR: Social & Activity Experience -->
+    @else if (auth.esCompradorVista()) {
+      <div class="buyer-experience fade-in">
+        <div class="buyer-welcome-card">
+          <div class="welcome-content">
+            <h2>¡Qué bueno verte, {{ nombreDisplay.split(' ')[0] }}!</h2>
+            <p>Descubre productos exclusivos en las transmisiones de hoy.</p>
+            <div class="welcome-badges">
+              <span class="b-tag">⭐ Miembro Gold</span>
+              <span class="b-tag">🎁 2 Cupones</span>
+            </div>
+          </div>
+          <div class="welcome-art">
+            <img src="https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=3d+abstract+shopping+objects+floating+blue+modern&image_size=square" alt="Welcome">
+          </div>
+        </div>
+
+        <div class="buyer-main-grid">
+          <div class="panel activity-feed">
+            <div class="panel-header-pro">
+              <h3>Mi Actividad</h3>
+              <div class="feed-filter">
+                <span class="active">Todo</span>
+                <span>Pedidos</span>
+                <span>Likes</span>
+              </div>
+            </div>
+            
+            <div class="empty-feed-pro">
+              <div class="feed-art">📺</div>
+              <p>Aún no has interactuado con transmisiones. ¡El show está por comenzar!</p>
+              <button class="btn btn-premium" routerLink="/envivos">Explorar Live Streams</button>
+            </div>
+          </div>
+
+          <!-- Gestionar Pedidos (Comprador) -->
+          <div class="panel my-orders-pro mt-8">
+            <div class="panel-header-pro">
+              <h3>Gestionar Mis Pedidos</h3>
+              <a routerLink="/tienda" class="link-pro-btn">Ir a comprar →</a>
+            </div>
+
+            <p class="buyer-orders-hint">
+              Aquí puedes ver el detalle, editar la entrega o cancelar tus pedidos. Para crear un pedido nuevo ve a la tienda.
+            </p>
+
+            <div class="orders-filter-bar">
+              @for (est of estados; track est.valor) {
+                <button
+                  type="button"
+                  class="chip-filter"
+                  [class.active]="filtroEstado() === est.valor"
+                  (click)="filtroEstado.set(est.valor)">
+                  {{ est.etiqueta }}
+                </button>
+              }
+            </div>
+
+            @if (cargandoPedidos()) {
+              <div class="loading-mini"><div class="spinner-premium sm"></div></div>
+            } @else if (pedidosFiltrados.length === 0) {
+              <div class="empty-orders-buyer">
+                <p>{{ filtroEstado() === 'todos' ? 'Aún no has realizado pedidos.' : 'No tienes pedidos en este estado.' }}</p>
+              </div>
+            } @else {
+              <div class="buyer-orders-list">
+                @for (pedido of pedidosFiltrados; track pedido.id) {
+                  <div class="buyer-order-item">
+                    <div class="order-main">
+                      <div class="order-ref">
+                        <strong>Pedido #{{ pedido.id }}</strong>
+                        <span>{{ pedido.created_at | date:'shortDate' }}</span>
+                      </div>
+                      <div class="order-status-tag" [style.background]="getEstadoColor(pedido.estado)">
+                        {{ etiquetaEstado(pedido.estado) }}
+                      </div>
+                    </div>
+                    <div class="order-details-mini">
+                      <span>{{ pedido.items?.length }} productos de 🏪 {{ pedido.vendedor?.nombre }}</span>
+                      <strong>{{ pedido.total | currency:'USD':'symbol':'1.0-0' }}</strong>
+                    </div>
+                    <div class="buyer-order-actions">
+                      <button class="btn-sm btn-ghost" (click)="abrirDetalle(pedido)">Detalle</button>
+                      @if (pedido.estado === 'pendiente') {
+                        <button class="btn-sm btn-ghost" (click)="actualizarEstadoPedido(pedido.id, 'cancelado')">Cancelar</button>
+                      }
+                      @if (puedeEliminar(pedido)) {
+                        <button class="btn-sm btn-danger-ghost" (click)="pedirEliminar(pedido)" title="Eliminar pedido">🗑️</button>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="buyer-side-panels">
+            <div class="panel social-stats-pro">
+              <div class="social-stat-item">
+                <div class="val">{{ perfil()?.stats?.siguiendo || 0 }}</div>
+                <div class="lab">Siguiendo</div>
+              </div>
+              <div class="v-divider"></div>
+              <div class="social-stat-item">
+                <div class="val">0</div>
+                <div class="lab">Favoritos</div>
+              </div>
+            </div>
+
+            <div class="panel upgrade-card mt-6">
+              <div class="upgrade-ic-container">🚀</div>
+              <h4>¿Eres emprendedor?</h4>
+              <p>Convierte tu cuenta en vendedor y llega a miles de personas en vivo.</p>
+              <button class="btn btn-upgrade" routerLink="/configuracion">Empezar a Vender</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- VISTA ADMINISTRADOR: Command Center Experience -->
+    @else if (auth.esAdminVista()) {
+      <div class="admin-experience fade-in">
+        <div class="admin-top-bar">
+          <div class="admin-title">
+            <span class="system-tag">NÚCLEO DEL SISTEMA</span>
+            <h2>Panel de Control Global</h2>
+          </div>
+          <div class="admin-server-status">
+            <div class="status-indicator">
+              <span class="dot"></span>
+              ESTADO: ÓPTIMO
+            </div>
+            <div class="server-load">CARGA: 12%</div>
+          </div>
+        </div>
+
+        <div class="admin-metrics-pro">
+          <div class="metric-card-pro">
+            <div class="m-head">
+              <span class="m-ic">👥</span>
+              <span class="m-trend">+4.2%</span>
+            </div>
+            <div class="m-val">{{ perfil()?.adminStats?.totalUsuarios || 0 }}</div>
+            <div class="m-lab">Usuarios Totales</div>
+          </div>
+          
+          <div class="metric-card-pro warning">
+            <div class="m-head">
+              <span class="m-ic">📄</span>
+              <span class="m-trend urgent">! Acción</span>
+            </div>
+            <div class="m-val">{{ perfil()?.adminStats?.solicitudesPendientes || 0 }}</div>
+            <div class="m-lab">Solicitudes Vendedor</div>
+          </div>
+
+          <div class="metric-card-pro active">
+            <div class="m-head">
+              <span class="m-ic">🔴</span>
+              <span class="m-trend">En Vivo</span>
+            </div>
+            <div class="m-val">{{ perfil()?.adminStats?.transmisionesEnVivo || 0 }}</div>
+            <div class="m-lab">Streams Activos</div>
+          </div>
+        </div>
+
+        <div class="admin-management-grid mt-10">
+          <div class="panel admin-tools-panel">
+            <h3>Gestión de Ecosistema</h3>
+            <div class="tools-list-pro">
+              <div class="tool-item-pro" routerLink="/admin/usuarios">
+                <div class="tool-ic">🛡️</div>
+                <div class="tool-det">
+                  <h4>Control de Usuarios</h4>
+                  <p>Roles, permisos y auditoría de cuentas.</p>
+                </div>
+                <span class="tool-arrow">→</span>
+              </div>
+              
+              <div class="tool-item-pro" routerLink="/dashboard">
+                <div class="tool-ic">📊</div>
+                <div class="tool-det">
+                  <h4>Centro de Analíticas</h4>
+                  <p>Métricas de negocio y tráfico global.</p>
+                </div>
+                <span class="tool-arrow">→</span>
+              </div>
+
+              <div class="tool-item-pro" routerLink="/configuracion">
+                <div class="tool-ic">⚙️</div>
+                <div class="tool-det">
+                  <h4>Parámetros Globales</h4>
+                  <p>Configuración técnica del marketplace.</p>
+                </div>
+                <span class="tool-arrow">→</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel admin-logs-mini">
+            <h3>Eventos Recientes</h3>
+            <div class="mini-logs">
+              <div class="log-entry">
+                <span class="time">Hace 2m</span>
+                <p>Nuevo usuario registrado: David G.</p>
+              </div>
+              <div class="log-entry">
+                <span class="time">Hace 15m</span>
+                <p>Solicitud de vendedor aprobada: "Tech Store"</p>
+              </div>
+              <div class="log-entry warning">
+                <span class="time">Hace 1h</span>
+                <p>Intento de acceso fallido (Admin IP: 192.168.1.1)</p>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm w-full mt-6">Ver Logs Completos</button>
+          </div>
+        </div>
+      </div>
+    }
+  }
+
+  <!-- MODAL: Detalle / edición de pedido -->
+  @if (pedidoDetalle(); as pedido) {
+    <div class="modal-backdrop" (click)="cerrarDetalle()">
+      <div class="modal-content-pro order-detail-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="modal-header-info">
+            <h2>Pedido #{{ pedido.id }}</h2>
+            <div class="order-status" [style.background]="getEstadoColor(pedido.estado)">
+              {{ etiquetaEstado(pedido.estado) | uppercase }}
+            </div>
+          </div>
+          <button type="button" class="modal-close" (click)="cerrarDetalle()" aria-label="Cerrar">✕</button>
+        </div>
+
+        <div class="modal-body">
+          @if (esVistaVendedor) {
+            <div class="detail-section">
+              <h4>Cliente</h4>
+              <div class="detail-list">
+                <div class="detail-row"><span>👤 Nombre</span><strong>{{ pedido.comprador?.nombre }}</strong></div>
+                <div class="detail-row"><span>📧 Correo</span><strong>{{ pedido.comprador?.correo }}</strong></div>
+              </div>
+            </div>
+          }
+
+          <div class="detail-section">
+            <div class="detail-section-head">
+              <h4>Datos de entrega</h4>
+              @if (puedeEditarEntrega && !editandoEntrega()) {
+                <button type="button" class="btn-sm btn-ghost" (click)="iniciarEdicion()">✏️ Editar</button>
+              }
+            </div>
+
+            @if (editandoEntrega()) {
+              <div class="form-grid">
+                <div class="field">
+                  <label>Ciudad</label>
+                  <input type="text" [(ngModel)]="formEdicion.ciudad" placeholder="Ciudad" />
+                </div>
+                <div class="field">
+                  <label>Municipio</label>
+                  <input type="text" [(ngModel)]="formEdicion.municipio" placeholder="Municipio" />
+                </div>
+                <div class="field full">
+                  <label>Dirección</label>
+                  <input type="text" [(ngModel)]="formEdicion.direccion" placeholder="Dirección exacta de entrega" />
+                </div>
+                <div class="field full">
+                  <label>Referencia (opcional)</label>
+                  <input type="text" [(ngModel)]="formEdicion.referencia_entrega" placeholder="Punto de referencia" />
+                </div>
+                <div class="field full">
+                  <label>Forma de pago</label>
+                  <select [(ngModel)]="formEdicion.metodo_pago">
+                    <option value="transferencia">Transferencia bancaria</option>
+                    <option value="contra_entrega">Pago contra entrega</option>
+                    <option value="efectivo">Efectivo</option>
+                  </select>
+                </div>
+              </div>
+            } @else {
+              <div class="detail-list">
+                <div class="detail-row"><span>📍 Entrega</span><strong>{{ pedido.municipio }}, {{ pedido.ciudad }}</strong></div>
+                <div class="detail-row"><span>🏠 Dirección</span><strong>{{ pedido.direccion }}</strong></div>
+                @if (pedido.referencia_entrega) {
+                  <div class="detail-row"><span>📝 Referencia</span><strong>{{ pedido.referencia_entrega }}</strong></div>
+                }
+                <div class="detail-row"><span>💳 Forma de pago</span><strong>{{ pedido.metodo_pago }}</strong></div>
+              </div>
+            }
+          </div>
+
+          <div class="detail-section">
+            <h4>Productos ({{ pedido.items?.length }})</h4>
+            <div class="detail-items">
+              @for (item of pedido.items; track item.id) {
+                <div class="detail-item">
+                  <span>{{ item.cantidad }}x {{ item.producto?.nombre }}</span>
+                  <strong>{{ (item.precio_unitario * item.cantidad) | currency:'USD':'symbol':'1.0-0' }}</strong>
+                </div>
+              }
+            </div>
+            <div class="detail-total">
+              <span>Total</span>
+              <strong>{{ pedido.total | currency:'USD':'symbol':'1.0-0' }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          @if (editandoEntrega()) {
+            <button type="button" class="btn btn-ghost" (click)="cancelarEdicion()">Cancelar</button>
+            <button type="button" class="btn btn-premium" [disabled]="guardandoPedido()" (click)="guardarEntrega()">
+              {{ guardandoPedido() ? 'Guardando…' : 'Guardar cambios' }}
+            </button>
+          } @else {
+            @if (esVistaVendedor) {
+              @if (pedido.estado === 'pendiente') {
+                <button type="button" class="btn btn-ghost" (click)="actualizarEstadoPedido(pedido.id, 'cancelado')">Rechazar</button>
+                <button type="button" class="btn btn-premium" (click)="actualizarEstadoPedido(pedido.id, 'confirmado')">Confirmar pedido</button>
+              } @else if (pedido.estado === 'confirmado') {
+                <button type="button" class="btn btn-premium" (click)="actualizarEstadoPedido(pedido.id, 'enviado')">Marcar enviado</button>
+              } @else if (pedido.estado === 'enviado') {
+                <button type="button" class="btn btn-premium" (click)="actualizarEstadoPedido(pedido.id, 'entregado')">Marcar entregado</button>
+              }
+            }
+            <button type="button" class="btn btn-ghost" (click)="cerrarDetalle()">Cerrar</button>
+            @if (puedeEliminar(pedido)) {
+              <button type="button" class="btn btn-danger" (click)="pedirEliminar(pedido)">Eliminar</button>
+            }
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: Confirmar eliminación -->
+  @if (pedidoAEliminar(); as pedido) {
+    <div class="modal-backdrop" (click)="cancelarEliminar()">
+      <div class="modal-content-pro confirm-modal" (click)="$event.stopPropagation()">
+        <div class="confirm-icon">🗑️</div>
+        <h3>¿Eliminar el pedido #{{ pedido.id }}?</h3>
+        <p>Esta acción no se puede deshacer. El pedido desaparecerá de tu historial.</p>
+        <div class="modal-footer center">
+          <button type="button" class="btn btn-ghost" (click)="cancelarEliminar()">Cancelar</button>
+          <button type="button" class="btn btn-danger" (click)="confirmarEliminar()">Sí, eliminar</button>
+        </div>
+      </div>
+    </div>
+  }
 </main>
 
 <app-footer></app-footer>

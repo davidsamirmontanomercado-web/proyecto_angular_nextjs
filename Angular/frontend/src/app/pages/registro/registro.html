@@ -25,19 +25,7 @@
       }
 
       <div class="field">
-        <label class="field-label">Tipo de cuenta</label>
-        <div class="role-row">
-          <div class="role-opt" [class.active]="role === 'empresa'" (click)="setRole('empresa')">
-            <div class="ic">🏢</div><div class="tt">Empresa</div><div class="sb">Vendo productos o servicios</div>
-          </div>
-          <div class="role-opt" [class.active]="role === 'comprador'" (click)="setRole('comprador')">
-            <div class="ic">🛒</div><div class="tt">Comprador</div><div class="sb">Busco productos o servicios</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="field">
-        <label class="field-label">Nombre completo o de la empresa</label>
+        <label class="field-label">Nombre completo</label>
         <div class="input-with-icon">
           <span class="ico">👤</span>
           <input type="text" class="field-input" placeholder="Ej: Muebles Caribe S.A.S"

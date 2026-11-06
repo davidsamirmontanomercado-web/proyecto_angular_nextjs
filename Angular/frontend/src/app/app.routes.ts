@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard } from './services/auth.service';
+import { authGuard, guestGuard, adminGuard } from './services/auth.service';
 
 export const routes: Routes = [
   { path: '', loadComponent: () => import('./pages/index/index').then(m => m.IndexComponent) },
@@ -14,7 +14,9 @@ export const routes: Routes = [
   { path: 'live', redirectTo: 'envivos', pathMatch: 'full' },
   { path: 'crear-live', canActivate: [authGuard], loadComponent: () => import('./pages/crear-live/crear-live').then(m => m.CrearLiveComponent) },
   { path: 'perfil', loadComponent: () => import('./pages/perfil/perfil').then(m => m.PerfilComponent) },
+  { path: 'comprar', loadComponent: () => import('./pages/comprar-productos/comprar-productos').then(m => m.ComprarProductosComponent) },
   { path: 'categorias', loadComponent: () => import('./pages/categorias/categorias').then(m => m.CategoriasComponent) },
   { path: 'configuracion', canActivate: [authGuard], loadComponent: () => import('./pages/configuracion/configuracion').then(m => m.ConfiguracionComponent) },
+  { path: 'admin/usuarios', canActivate: [adminGuard], loadComponent: () => import('./pages/admin-usuarios/admin-usuarios').then(m => m.AdminUsuariosComponent) },
   { path: '**', redirectTo: '' }
 ];

@@ -80,6 +80,27 @@ export async function GET(request: Request) {
 
     const { access_token, refresh_token, expires_in = 3600, user } = data.session;
 
+    // Detectar si el usuario tiene MFA (2FA) activo
+    const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+    const activeFactor = !factorsError && factors && factors.all.find(f => f.status === 'verified');
+
+    const angularBase = resolveAngularBase(request);
+    const isRecovery = requestUrl.searchParams.get('type') === 'recovery';
+
+    // Si es recuperación de contraseña, redirigimos a la página específica en Angular.
+    if (isRecovery) {
+      const recoveryUrl = new URL(`${angularBase}/restablecer-contrasena`);
+      recoveryUrl.searchParams.set('token', access_token);
+      return NextResponse.redirect(recoveryUrl);
+    }
+
+    // El rol real viene en la metadata si ya existe; para un alta nueva vía
+    // Google se asigna 'comprador' por defecto.
+    const rolUsuario =
+      typeof user?.user_metadata?.rol === 'string' && user.user_metadata.rol
+        ? user.user_metadata.rol
+        : 'comprador';
+
     const angularUser = {
       id: user?.id,
       nombre:
@@ -87,7 +108,7 @@ export async function GET(request: Request) {
         (user?.user_metadata?.name as string) ||
         (user?.email ? user.email.split('@')[0] : 'Usuario'),
       correo: user?.email || '',
-      rol: 'empresa' as const,
+      rol: rolUsuario,
       createdAt: user?.created_at ? new Date(user.created_at).getTime() : Date.now(),
     };
 
@@ -103,11 +124,15 @@ export async function GET(request: Request) {
     } catch {
       userB64 = encodeURIComponent(json);
     }
-    const angularBase = resolveAngularBase(request);
     const successUrl = new URL(`${angularBase}/google-auth`);
     successUrl.searchParams.set('user', userB64);
     successUrl.searchParams.set('at', access_token);
     successUrl.searchParams.set('rt', refresh_token || '');
+    
+    if (activeFactor) {
+      successUrl.searchParams.set('mfa', '1');
+      successUrl.searchParams.set('fid', activeFactor.id);
+    }
 
     const next = NextResponse.redirect(successUrl);
     // La cookie de origen ya no hace falta: se limpia para no reutilizarla.

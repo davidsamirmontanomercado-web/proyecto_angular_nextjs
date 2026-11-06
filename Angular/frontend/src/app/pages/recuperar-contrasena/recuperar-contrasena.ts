@@ -19,9 +19,8 @@ export class RecuperarContrasenaComponent {
   enviado = signal(false);
   errorMsg = signal('');
   cargando = signal(false);
-  tokenDemo = signal('');
 
-  onSubmit(e: Event) {
+  async onSubmit(e: Event) {
     e.preventDefault();
     this.errorMsg.set('');
 
@@ -31,23 +30,16 @@ export class RecuperarContrasenaComponent {
     }
 
     this.cargando.set(true);
-    setTimeout(() => {
-      const res = this.auth.solicitarRecuperacion(this.correo.trim());
-      this.cargando.set(false);
+    const res: any = await this.auth.solicitarRecuperacionRemote(this.correo.trim());
+    this.cargando.set(false);
 
-      if (!res.ok) {
-        this.errorMsg.set(res.error || 'Error');
-        this.toast.err(res.error || 'Error');
-        return;
-      }
-
-      this.tokenDemo.set(res.token!);
+    if (res.ok) {
       this.enviado.set(true);
       this.toast.ok('Correo de recuperación enviado');
-    }, 700);
-  }
-
-  irARestablecer() {
-    this.router.navigate(['/restablecer-contrasena'], { queryParams: { token: this.tokenDemo() } });
+    } else {
+      console.log('Error de recuperación:', res);
+      this.errorMsg.set(res.error || 'No se pudo enviar el correo.');
+      this.toast.err(res.error || 'Error al enviar');
+    }
   }
 }

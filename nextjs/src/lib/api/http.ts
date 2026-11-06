@@ -62,11 +62,15 @@ export type AuthResult =
 // La cabecera `global.headers.Authorization` es redundante para PostgREST pero
 // garantiza que Storage (que no siempre hereda `accessToken`) también reciba el
 // token del usuario y aplique las políticas de `storage.objects`.
-function crearClienteDeUsuario(token: string): SupabaseClient {
+export function crearClienteDeUsuario(token: string): SupabaseClient {
   const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
 
   return createClient(supabaseUrl, supabaseAnonKey, {
-    accessToken: async () => token,
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    },
     global: { headers: { Authorization: `Bearer ${token}` } }
   });
 }
@@ -86,22 +90,61 @@ export async function requireUser(request: Request): Promise<AuthResult> {
   }
 
   try {
-    const clienteAuth = await createServerSupabase();
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
+    const clienteAuth = createClient(supabaseUrl, supabaseAnonKey);
     const { data, error } = await clienteAuth.auth.getUser(token);
 
     if (error || !data.user) {
+      console.error('[requireUser] Token rechazado por Supabase:', error?.message);
       return {
         ok: false,
         status: 401,
-        mensaje: 'Token no válido o sesión expirada.'
+        mensaje: error?.message || 'Token no válido o sesión expirada.'
       };
     }
 
     return { ok: true, usuario: data.user, token, db: crearClienteDeUsuario(token) };
   } catch (err) {
-    console.error('Error validando el token:', err);
+    console.error('[requireUser] Error validando el token:', err);
     return { ok: false, status: 500, mensaje: 'Error interno del servidor.' };
   }
+}
+
+/**
+ * Exige que el usuario tenga uno de los roles especificados.
+ *
+ * El rol vive en `user_metadata.rol` (es el que usan también las políticas RLS
+ * de Supabase). Si el token no lo trae —por ejemplo una cuenta creada vía
+ * Google antes de definir roles— se cae al valor real de `public.usuarios.rol`
+ * para no denegar el acceso por un dato ausente en la metadata.
+ */
+export async function requireRole(
+  auth: AuthResult,
+  rolesPermitidos: string[]
+): Promise<{ ok: boolean; status: number; mensaje: string }> {
+  if (!auth.ok) return auth;
+
+  // Priorizamos app_metadata que es donde el admin guarda el rol real
+  let rolUsuario: string = auth.usuario.app_metadata?.rol ?? auth.usuario.user_metadata?.rol ?? '';
+
+  if (!rolUsuario) {
+    const { data } = await auth.db
+      .from('usuarios')
+      .select('rol')
+      .eq('id', auth.usuario.id)
+      .maybeSingle();
+    rolUsuario = data?.rol ?? '';
+  }
+
+  if (!rolesPermitidos.includes(rolUsuario)) {
+    return {
+      ok: false,
+      status: 403,
+      mensaje: `Acceso denegado: se requiere rol ${rolesPermitidos.join(' o ')}.`
+    };
+  }
+
+  return { ok: true, status: 200, mensaje: 'OK' };
 }
 
 export const UUID_RE =

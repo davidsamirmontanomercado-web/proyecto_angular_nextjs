@@ -1,0 +1,327 @@
+<app-navbar></app-navbar>
+
+<main class="container page-top">
+  <header class="page-header">
+    <div class="header-content">
+      <span class="tag">Tienda LiveMarket</span>
+      <h1>Catálogo Exclusivo</h1>
+      <p class="subtitle">Descubre productos premium seleccionados directamente de nuestros mejores fabricantes y diseñadores.</p>
+    </div>
+  </header>
+
+  <!-- Buscador y Filtros Avanzados -->
+  <section class="filters-section panel mb-8">
+    <div class="search-bar-container">
+      <div class="search-input-wrapper">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          placeholder="¿Qué estás buscando hoy?" 
+          [(ngModel)]="filtros.q"
+          (keyup.enter)="aplicarFiltros()"
+          class="search-input"
+        >
+      </div>
+      <button class="btn btn-premium" (click)="aplicarFiltros()">Buscar</button>
+    </div>
+
+    <div class="advanced-filters mt-6">
+      <div class="filter-group">
+        <label>Categoría</label>
+        <select [(ngModel)]="filtros.categoria" (change)="aplicarFiltros()">
+          <option value="">Todas las categorías</option>
+          @for (cat of categorias(); track cat) {
+            <option [value]="cat">{{ cat }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Tienda</label>
+        <select [(ngModel)]="filtros.vendedorId" (change)="aplicarFiltros()">
+          <option value="">Todas las empresas</option>
+          @for (v of vendedores(); track v.id) {
+            <option [value]="v.id">{{ v.nombre }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Rango de Precio</label>
+        <div class="price-inputs">
+          <input type="number" placeholder="Min" [(ngModel)]="filtros.minPrecio" (change)="aplicarFiltros()">
+          <span>-</span>
+          <input type="number" placeholder="Max" [(ngModel)]="filtros.maxPrecio" (change)="aplicarFiltros()">
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label>Ordenar por</label>
+        <select [(ngModel)]="filtros.orden" (change)="aplicarFiltros()">
+          @for (o of ordenes; track o.valor) {
+            <option [value]="o.valor">{{ o.etiqueta }}</option>
+          }
+        </select>
+      </div>
+
+      <button class="btn-ghost btn-sm" (click)="limpiarFiltros()" *ngIf="hayFiltrosActivos">
+        Limpiar Filtros
+      </button>
+    </div>
+  </section>
+
+  <div class="shop-grid">
+    <!-- Listado de Productos -->
+    <section class="products-section">
+      <div class="section-title">
+        <span>✨</span> 
+        {{ filtros.q ? 'Resultados para "' + filtros.q + '"' : 'Productos destacados' }}
+      </div>
+      
+      @if (cargando()) {
+        <div class="loading-state py-12">
+          <div class="spinner-premium"></div>
+          <p>Actualizando catálogo...</p>
+        </div>
+      } @else if (productos().length === 0) {
+        <div class="empty-state py-12">
+          <div class="empty-art">🔎</div>
+          <h3>No encontramos productos</h3>
+          <p>Intenta ajustar tus filtros o buscar algo diferente.</p>
+          <button class="btn btn-premium-outline mt-4" (click)="limpiarFiltros()">Ver todo el catálogo</button>
+        </div>
+      } @else {
+        <div class="products-list">
+          @for (p of productos(); track p.id) {
+            <div class="product-card">
+              <div class="product-img">
+                <img [src]="p.imagen" [alt]="p.nombre" loading="lazy">
+                <span class="product-cat">{{ p.categoria }}</span>
+                @if (p.tag) {
+                  <span class="product-cat" style="right: 16px; left: auto; background: var(--text); color: #fff;">{{ p.tag }}</span>
+                }
+              </div>
+              <div class="product-info">
+                <h3>{{ p.nombre }}</h3>
+                <p class="product-desc">{{ p.descripcion }}</p>
+                <div class="product-vendedor" *ngIf="p.vendedor">
+                  <span class="ic">🏪</span> {{ p.vendedor.nombre }}
+                </div>
+                <span class="price">{{ p.precio | currency:'USD':'symbol':'1.0-0' }}</span>
+                
+                <div class="purchase-actions">
+                  <div class="qty-input">
+                    <button (click)="setCantidad(p.id, (cantidades.get(p.id) || 1) - 1)" aria-label="Disminuir cantidad">-</button>
+                    <input type="number" [ngModel]="cantidades.get(p.id)" (ngModelChange)="setCantidad(p.id, $event)" min="1" readonly>
+                    <button (click)="setCantidad(p.id, (cantidades.get(p.id) || 1) + 1)" aria-label="Aumentar cantidad">+</button>
+                  </div>
+                  <button class="btn-add" (click)="agregarAlCarrito(p)">
+                    Añadir
+                  </button>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- Carrito de Compras (Glassmorphism Sidebar) -->
+    <aside class="cart-section">
+      <div class="cart-card">
+        <div class="cart-header">
+          <h3>Mi Compra</h3>
+          <span class="cart-count">{{ carrito().length }}</span>
+        </div>
+
+        <div class="cart-items">
+          @if (carrito().length === 0) {
+            <div class="empty-cart">
+              <div class="empty-icon">🛍️</div>
+              <p style="font-weight: 700; color: var(--text); margin-bottom: 4px;">Tu carrito está vacío</p>
+              <span style="font-size: 13px;">Explora el catálogo y añade tus productos favoritos.</span>
+            </div>
+          } @else {
+            @for (item of carrito(); track $index) {
+              <div class="cart-item">
+                <img [src]="item.producto.imagen" [alt]="item.producto.nombre" class="item-thumb">
+                <div class="item-details">
+                  <h4>{{ item.producto.nombre }}</h4>
+                  <p class="item-price">{{ item.producto.precio | currency:'USD':'symbol':'1.0-0' }} x {{ item.cantidad }}</p>
+                  
+                  <div class="item-actions">
+                    <div class="qty-small">
+                      <button (click)="actualizarCantidad($index, -1)">-</button>
+                      <span>{{ item.cantidad }}</span>
+                      <button (click)="actualizarCantidad($index, 1)">+</button>
+                    </div>
+                    <button class="btn-remove" (click)="eliminarDelCarrito($index)" title="Eliminar del carrito">
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+                <div class="item-total">
+                  {{ (item.producto.precio * item.cantidad) | currency:'USD':'symbol':'1.0-0' }}
+                </div>
+              </div>
+            }
+          }
+        </div>
+
+        @if (carrito().length > 0) {
+          <div class="cart-footer">
+            <div class="total-row">
+              <span class="total-label">Subtotal estimado</span>
+              <span class="total-price">{{ total | currency:'USD':'symbol':'1.0-0' }}</span>
+            </div>
+            <p class="empresas-nota">
+              🏪 Se enviará a {{ carritoPorEmpresa.length }} empresa(s)
+            </p>
+            <button class="btn-checkout" (click)="confirmarPedido()">
+              Finalizar Pedido
+            </button>
+            <p style="text-align: center; font-size: 12px; color: var(--text-soft); margin-top: 16px;">
+              🔒 Pago seguro procesado por LiveMarket
+            </p>
+          </div>
+        }
+      </div>
+    </aside>
+  </div>
+
+  <!-- Modal de Checkout Premium -->
+  @if (mostrarCheckout()) {
+    <div class="modal-backdrop fade-in" (click)="cerrarCheckout()">
+      <div class="modal-content-pro glass-panel" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>{{ pasoCheckout() === 'datos' ? 'Datos de Entrega' : 'Confirmar Pedido' }}</h2>
+          <button class="btn-close" (click)="cerrarCheckout()">×</button>
+        </div>
+
+        <div class="checkout-steps">
+          <div class="step" [class.active]="pasoCheckout() === 'datos'" [class.done]="pasoCheckout() === 'revision'">
+            <span class="step-dot">1</span> Entrega y pago
+          </div>
+          <div class="step-line"></div>
+          <div class="step" [class.active]="pasoCheckout() === 'revision'">
+            <span class="step-dot">2</span> Revisión
+          </div>
+        </div>
+
+        @if (pasoCheckout() === 'datos') {
+          <div class="modal-body">
+            <p class="instruction">Confirma los datos de entrega y tu método de pago. El pedido se enviará a la empresa dueña de cada producto.</p>
+
+            <div class="checkout-form mt-6">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Ciudad</label>
+                  <input type="text" [(ngModel)]="formEntrega.ciudad" placeholder="Ej: Bogotá">
+                </div>
+                <div class="form-group">
+                  <label>Municipio / Localidad</label>
+                  <input type="text" [(ngModel)]="formEntrega.municipio" placeholder="Ej: Chapinero">
+                </div>
+              </div>
+
+              <div class="form-group mt-4">
+                <label>Dirección Exacta</label>
+                <input type="text" [(ngModel)]="formEntrega.direccion" placeholder="Calle, Carrera, Apto, Casa...">
+              </div>
+
+              <div class="form-group mt-4">
+                <label>Referencia Adicional (Opcional)</label>
+                <textarea [(ngModel)]="formEntrega.referencia_entrega" placeholder="Ej: Portería, frente al parque..."></textarea>
+              </div>
+
+              <div class="form-group mt-6">
+                <label>Método de Pago</label>
+                <div class="payment-options">
+                  <label class="payment-option">
+                    <input type="radio" name="pago" [(ngModel)]="formEntrega.metodo_pago" value="transferencia">
+                    <div class="option-content">
+                      <span class="ic">🏦</span>
+                      <div class="det">
+                        <strong>Transferencia</strong>
+                        <span>Bancolombia, Nequi, Daviplata</span>
+                      </div>
+                    </div>
+                  </label>
+                  <label class="payment-option">
+                    <input type="radio" name="pago" [(ngModel)]="formEntrega.metodo_pago" value="contraentrega">
+                    <div class="option-content">
+                      <span class="ic">🚚</span>
+                      <div class="det">
+                        <strong>Contra Entrega</strong>
+                        <span>Paga al recibir el producto</span>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer mt-8">
+            <button class="btn btn-premium-outline" (click)="cerrarCheckout()">Cancelar</button>
+            <button class="btn btn-premium" (click)="irARevision()">Revisar pedido</button>
+          </div>
+        } @else {
+          <div class="modal-body">
+            <p class="instruction">Revisa y confirma todos los datos. Al enviar, cada empresa recibirá su pedido.</p>
+
+            <div class="review-block mt-6">
+              <label class="review-label">📍 Entrega</label>
+              <div class="review-card">
+                <p><strong>{{ formEntrega.municipio }}</strong>, {{ formEntrega.ciudad }}</p>
+                <p>{{ formEntrega.direccion }}</p>
+                @if (formEntrega.referencia_entrega) {
+                  <p class="muted">Ref: {{ formEntrega.referencia_entrega }}</p>
+                }
+              </div>
+            </div>
+
+            <div class="review-block mt-4">
+              <label class="review-label">💳 Forma de pago</label>
+              <div class="review-card">
+                <p>{{ formEntrega.metodo_pago === 'contraentrega' ? 'Contra entrega (pagas al recibir)' : 'Transferencia (Bancolombia, Nequi, Daviplata)' }}</p>
+              </div>
+            </div>
+
+            <div class="review-block mt-4">
+              <label class="review-label">🏪 Empresas destino ({{ carritoPorEmpresa.length }})</label>
+              @for (grupo of carritoPorEmpresa; track grupo.vendedorId) {
+                <div class="review-card mt-3">
+                  <div class="empresa-head">
+                    <strong>{{ grupo.vendedorNombre }}</strong>
+                    <span>{{ grupo.subtotal | currency:'USD':'symbol':'1.0-0' }}</span>
+                  </div>
+                  @for (item of grupo.items; track item.producto.id) {
+                    <div class="review-item">
+                      <span>{{ item.cantidad }}x {{ item.producto.nombre }}</span>
+                      <strong>{{ (item.producto.precio * item.cantidad) | currency:'USD':'symbol':'1.0-0' }}</strong>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <div class="review-total mt-6">
+              <span>Total del pedido</span>
+              <strong>{{ total | currency:'USD':'symbol':'1.0-0' }}</strong>
+            </div>
+          </div>
+
+          <div class="modal-footer mt-8">
+            <button class="btn btn-premium-outline" (click)="volverADatos()" [disabled]="enviandoPedido()">Volver</button>
+            <button class="btn btn-premium" (click)="realizarPedido()" [disabled]="enviandoPedido()">
+              {{ enviandoPedido() ? 'Procesando...' : 'Confirmar y enviar pedido' }}
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</main>
+
+<app-footer></app-footer>

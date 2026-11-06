@@ -16,50 +16,77 @@
   </aside>
 
   <main class="auth-form-wrap">
-    <form class="auth-form" (ngSubmit)="onSubmit($event)" novalidate>
+    <div class="auth-form">
       @if (!enviado()) {
         <div class="back-link">
-          <a routerLink="/login">← Volver a iniciar sesión</a>
+          <a routerLink="/login">
+            <span class="back-ico">←</span>
+            Volver al inicio
+          </a>
         </div>
-        <h2>Recuperar contraseña</h2>
-        <p class="lead">Ingresa tu correo y te enviaremos un enlace para restablecerla</p>
+        
+        <div class="form-header">
+          <h2>Recuperar acceso</h2>
+          <p class="lead">Te enviaremos un enlace seguro para restablecer tu contraseña</p>
+        </div>
 
         @if (errorMsg()) {
-          <div class="alert alert-error show">{{ errorMsg() }}</div>
+          <div class="alert alert-error show">
+            <span class="alert-ico">⚠️</span>
+            <div class="alert-content">
+              {{ errorMsg() }}
+            </div>
+          </div>
         }
 
-        <div class="field">
-          <label class="field-label">Correo electrónico</label>
-          <div class="input-with-icon">
-            <span class="ico">✉️</span>
-            <input type="email" class="field-input" placeholder="tu@empresa.com"
-                   [(ngModel)]="correo" name="correo" required>
+        <form (ngSubmit)="onSubmit($event)" novalidate>
+          <div class="field">
+            <label class="field-label">Correo electrónico</label>
+            <div class="input-with-icon">
+              <span class="ico">✉️</span>
+              <input type="email" class="field-input" placeholder="tu@ejemplo.com"
+                     [(ngModel)]="correo" name="correo" required>
+            </div>
           </div>
-        </div>
 
-        <button type="submit" class="btn btn-primary btn-full btn-lg" [disabled]="cargando()">
-          {{ cargando() ? 'Enviando...' : 'Enviar enlace de recuperación' }}
-        </button>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" [disabled]="cargando()">
+            @if (cargando()) {
+              <span class="spinner"></span>
+              <span>Enviando enlace...</span>
+            } @else {
+              <span>Enviar enlace de recuperación</span>
+            }
+          </button>
+        </form>
 
-        <p class="auth-foot">¿Ya la recordaste? <a routerLink="/login">Inicia sesión</a></p>
+        <p class="auth-foot">¿Recordaste tu clave? <a routerLink="/login">Inicia sesión</a></p>
       } @else {
-        <div class="success-card">
-          <div class="success-ico">📬</div>
-          <h2>¡Enlace enviado!</h2>
-          <p class="lead">
-            Revisa tu bandeja de entrada de <strong>{{ correo }}</strong>. Hemos enviado un enlace para restablecer tu contraseña.
-          </p>
-          <div class="hint">
-            <strong>Demo:</strong> en un entorno real este enlace llegaría por email. Haz clic abajo para simularlo.
+        <div class="status-card success">
+          <div class="status-ico-glow">
+            <div class="success-ico"></div>
           </div>
-          <button type="button" class="btn btn-primary btn-full btn-lg" (click)="irARestablecer()">
-            Simular clic en el enlace →
-          </button>
-          <button type="button" class="btn btn-ghost btn-full" (click)="enviado.set(false); tokenDemo.set(''); correo='';">
-            Usar otro correo
-          </button>
+          
+          <h2>¡Revisa tu bandeja!</h2>
+          
+          <p class="lead">
+            Hemos enviado un enlace seguro a <strong>{{ correo }}</strong>. El enlace expira en 60 minutos.
+          </p>
+          
+          <div class="hint-box">
+            <span class="hint-ico">💡</span>
+            <p>Si no lo ves, revisa tu carpeta de correo no deseado o spam.</p>
+          </div>
+
+          <div class="actions-stack">
+            <button type="button" class="btn btn-primary btn-full btn-lg" routerLink="/login">
+              Volver al inicio de sesión
+            </button>
+            <button type="button" class="btn btn-ghost btn-full" (click)="enviado.set(false)">
+              Intentar con otro correo
+            </button>
+          </div>
         </div>
       }
-    </form>
+    </div>
   </main>
 </div>

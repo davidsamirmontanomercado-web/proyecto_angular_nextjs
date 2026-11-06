@@ -20,14 +20,14 @@ export class RegistroComponent {
   pass = '';
   pass2 = '';
   terms = false;
-  role: 'empresa' | 'comprador' = 'empresa';
+  role: 'vendedor' | 'comprador' = 'comprador';
   loadingGoogle = signal(false);
   enviando = signal(false);
   errorMsg = signal('');
 
-  readonly googleLoginUrl = `${this.auth.backendUrl}/google-auth/login`;
+  readonly googleLoginUrl = this.auth.googleLoginUrl;
 
-  setRole(r: 'empresa' | 'comprador') { this.role = r; }
+  setRole(r: 'vendedor' | 'comprador') { this.role = r; }
 
   async onSubmit(e: Event) {
     e.preventDefault();
@@ -56,7 +56,7 @@ export class RegistroComponent {
       nombre: this.nombre.trim(),
       correo: this.correo.trim(),
       pass: this.pass,
-      rol: this.role
+      rol: 'comprador'
     });
     this.enviando.set(false);
 
@@ -73,7 +73,8 @@ export class RegistroComponent {
     }
 
     this.toast.ok('Cuenta creada con éxito');
-    setTimeout(() => this.router.navigateByUrl('/dashboard'), 500);
+    const destino = this.auth.rutaInicio();
+    setTimeout(() => this.router.navigateByUrl(destino), 500);
   }
 
   async startGoogleLogin(e: MouseEvent) {

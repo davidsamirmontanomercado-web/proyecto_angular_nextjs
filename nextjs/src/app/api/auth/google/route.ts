@@ -62,7 +62,8 @@ export async function GET(request: Request) {
         redirectTo,
         queryParams: {
           access_type: 'offline',
-          prompt: 'consent',
+          // Eliminamos 'prompt: consent' para que Google no pida permisos cada vez
+          // si el usuario ya los concedió una vez.
         },
         skipBrowserRedirect: true,
       },

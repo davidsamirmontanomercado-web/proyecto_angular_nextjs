@@ -44,21 +44,26 @@ export class RestablecerContrasenaComponent implements OnInit {
   });
 
   ngOnInit() {
-    const t = this.route.snapshot.queryParamMap.get('token') || '';
-    this.token.set(t);
+    // Primero intentamos del query param (por si viene de un link directo custom)
+    let t = this.route.snapshot.queryParamMap.get('token') || '';
+    
+    // Si no está en query params, buscamos en el fragmento (#access_token=...) 
+    // que es como Supabase envía el link de recuperación por defecto.
     if (!t) {
-      this.tokenError.set('Enlace inválido. Solicita uno nuevo.');
-      return;
+      const fragment = this.route.snapshot.fragment || '';
+      const params = new URLSearchParams(fragment);
+      t = params.get('access_token') || '';
     }
-    const val = this.auth.validarToken(t);
-    if (!val.ok) {
-      this.tokenError.set(val.error || 'Token inválido.');
-    } else {
+
+    if (t) {
+      this.token.set(t);
       this.tokenValido.set(true);
+    } else {
+      this.tokenError.set('No se encontró un token de acceso válido en el enlace.');
     }
   }
 
-  onSubmit(e: Event) {
+  async onSubmit(e: Event) {
     e.preventDefault();
     this.errorMsg.set('');
 
@@ -76,19 +81,26 @@ export class RestablecerContrasenaComponent implements OnInit {
     }
 
     this.cargando.set(true);
-    setTimeout(() => {
-      const res = this.auth.restablecerContrasena(this.token(), this.pass);
+    // Usamos el token capturado o el del AuthService si ya se procesó
+    const tokenParaEnviar = this.token() || this.auth.getToken() || '';
+    
+    if (!tokenParaEnviar) {
+      this.errorMsg.set('Tu sesión ha expirado o el enlace ya no es válido. Solicita uno nuevo.');
       this.cargando.set(false);
+      return;
+    }
 
-      if (!res.ok) {
-        this.errorMsg.set(res.error || 'Error');
-        this.toast.err(res.error || 'Error');
-        return;
-      }
+    const res = await this.auth.restablecerContrasenaRemote(tokenParaEnviar, this.pass);
+    this.cargando.set(false);
 
-      this.exito.set(true);
-      this.toast.ok('Contraseña actualizada correctamente');
-    }, 700);
+    if (!res.ok) {
+      this.errorMsg.set(res.error || 'Error');
+      this.toast.err(res.error || 'Error');
+      return;
+    }
+
+    this.exito.set(true);
+    this.toast.ok('Contraseña actualizada correctamente');
   }
 
   irAlLogin() {

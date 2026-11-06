@@ -4,7 +4,7 @@ import { AuthService } from './auth.service';
 
 const ENDPOINT_REFRESH = 'http://localhost:3000/api/auth/refresh';
 
-const perfil = { nombre: 'Ana', correo: 'ana@a.com', rol: 'empresa' as const };
+const perfil = { nombre: 'Ana', correo: 'ana@a.com', rol: 'vendedor' as const };
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -124,7 +124,7 @@ describe('AuthService', () => {
       nombre: 'Ana',
       correo: 'ana@a.com',
       pass: '123456',
-      rol: 'empresa',
+      rol: 'vendedor',
     });
 
     expect(res.ok).toBe(true);
@@ -147,7 +147,7 @@ describe('AuthService', () => {
       nombre: 'Ana',
       correo: 'ana@a.com',
       pass: '123456',
-      rol: 'empresa',
+      rol: 'vendedor',
     });
 
     expect(res.ok).toBe(true);
@@ -199,7 +199,7 @@ describe('AuthService', () => {
 describe('AuthService · backend por entorno', () => {
   const OVERRIDE_PROD = 'https://backend-one-liard-61.vercel.app';
 
-  const perfil = { nombre: 'Ana', correo: 'ana@a.com', rol: 'empresa' as const };
+  const perfil = { nombre: 'Ana', correo: 'ana@a.com', rol: 'vendedor' as const };
 
   /** Crea un AuthService nuevo simulando que la página se sirve desde `hostname`. */
   function crearServicioComo(hostname: string): AuthService {

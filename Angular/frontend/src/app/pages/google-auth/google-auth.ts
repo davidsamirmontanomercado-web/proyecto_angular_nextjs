@@ -124,16 +124,31 @@ export default class GoogleAuthComponent implements OnInit {
         id: raw.id,
         nombre: raw.nombre || raw.correo.split('@')[0],
         correo: raw.correo,
-        rol: raw.rol === 'comprador' ? 'comprador' : 'empresa',
+        rol: AuthService.normalizarRol(raw.rol),
         createdAt: raw.createdAt || Date.now(),
+        provider: 'google',
       };
 
       this.auth.setSession(user, at, rt);
 
+      if (q.get('mfa') === '1') {
+        const fid = q.get('fid') || '';
+        this.toast.info('Verificación en dos pasos requerida');
+        this.router.navigate(['/login'], { 
+          queryParams: { 
+            mfa: '1', 
+            fid: fid
+          },
+          replaceUrl: true
+        });
+        return;
+      }
+
       this.toast.ok(`¡Bienvenido, ${user.nombre}!`);
 
+      const destino = this.auth.rutaInicio();
       setTimeout(() => {
-        this.router.navigateByUrl('/dashboard', { replaceUrl: true });
+        this.router.navigateByUrl(destino, { replaceUrl: true });
       }, 350);
     } catch (e: any) {
       console.error('[GoogleAuthComponent] Error:', e);

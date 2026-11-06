@@ -66,6 +66,13 @@ export default async function GoogleLoginPage({
     const at = cookieStore.get('sb-access-token')?.value || '';
     const rt = cookieStore.get('sb-refresh-token')?.value || '';
 
+    // El rol real viene en la metadata si ya existe; para un alta nueva vía
+    // Google se asigna 'comprador' por defecto.
+    const rolUsuario =
+      typeof user?.user_metadata?.rol === 'string' && user.user_metadata.rol
+        ? user.user_metadata.rol
+        : 'comprador';
+
     const angularUser = {
       id: user.id,
       nombre:
@@ -73,7 +80,7 @@ export default async function GoogleLoginPage({
         (user?.user_metadata?.name as string) ||
         (user?.email ? user.email.split('@')[0] : 'Usuario'),
       correo: user?.email || '',
-      rol: 'empresa' as const,
+      rol: rolUsuario,
       createdAt: user?.created_at ? new Date(user.created_at).getTime() : Date.now(),
     };
 

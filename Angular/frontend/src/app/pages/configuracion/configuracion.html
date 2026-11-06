@@ -1,45 +1,398 @@
 <app-navbar></app-navbar>
 
-<main class="container page-top" style="padding-bottom:60px;max-width:760px">
-  <div class="section-head" style="text-align:left">
-    <span class="tag">Cuenta</span>
-    <h2 class="section-title">Configuración</h2>
-    <p class="section-sub" style="margin:0">Administra los datos de tu cuenta y preferencias.</p>
-  </div>
-
-  <div class="panel" style="margin-bottom:20px">
-    <div class="panel-head"><h3>Datos de la cuenta</h3></div>
-    <div class="field">
-      <label class="field-label">Nombre</label>
-      <input type="text" class="field-input" [(ngModel)]="nombre">
-    </div>
-    <div class="field">
-      <label class="field-label">Correo electrónico</label>
-      <input type="email" class="field-input" [value]="correo" disabled>
-      <span class="field-hint">El correo no se puede modificar.</span>
-    </div>
-    <button class="btn btn-primary" (click)="guardar()">Guardar cambios</button>
-  </div>
-
-  <div class="panel" style="margin-bottom:20px">
-    <div class="panel-head"><h3>Preferencias</h3></div>
-    <div style="display:flex;flex-direction:column;gap:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:14px">
-        <div><div style="font-size:13px;font-weight:600">Notificaciones por correo</div><div style="font-size:12px;color:var(--text-soft)">Recibe avisos cuando alguien inicie un en vivo</div></div>
-        <label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label>
+<main class="container page-top">
+  <div class="config-wrapper">
+    <!-- Header de Configuración Premium -->
+    <header class="config-header">
+      <div class="header-info">
+        <h1>Configuración</h1>
+        <p>Gestiona tu identidad digital y preferencias de seguridad.</p>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:14px">
-        <div><div style="font-size:13px;font-weight:600">Modo privado</div><div style="font-size:12px;color:var(--text-soft)">Oculta tu perfil de las búsquedas públicas</div></div>
-        <label class="switch"><input type="checkbox"><span class="switch-track"></span></label>
-      </div>
-    </div>
-  </div>
+      <button class="btn-save" (click)="guardar()" [disabled]="loading()">
+        {{ loading() ? 'Guardando...' : 'Actualizar Perfil' }}
+      </button>
+    </header>
 
-  <div class="panel" style="border-color:#fecaca">
-    <div class="panel-head"><h3 style="color:var(--err)">Zona de peligro</h3></div>
-    <p style="font-size:13px;color:var(--text-soft);margin-bottom:14px">Estas acciones son permanentes.</p>
-    <button class="btn btn-danger" (click)="logout()">Cerrar sesión</button>
-    <button class="btn btn-danger" style="margin-left:8px" (click)="eliminarCuenta()">Eliminar cuenta</button>
+    <div class="config-grid">
+      <!-- Columna Principal -->
+      <div class="main-col">
+        <!-- Resumen de Perfil Premium -->
+        <section class="config-panel profile-summary">
+          <div class="summary-content">
+            <div class="avatar-large">
+              {{ nombre.charAt(0).toUpperCase() }}
+            </div>
+            <div class="summary-text">
+              <h2>{{ nombre || 'Usuario LiveMarket' }}</h2>
+              <span class="badge" [class.badge-premium]="auth.esVendedorVista()">
+                {{ auth.esVendedorVista() ? 'Cuenta Vendedor' : (auth.esAdminVista() ? 'Administrador' : 'Cuenta Comprador') }}
+              </span>
+              <p>{{ correo }}</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Sección: Identidad -->
+        <section class="config-panel">
+          <div class="panel-content">
+            <div class="panel-title-row">
+              <div class="panel-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              </div>
+              <h3>Identidad</h3>
+            </div>
+            
+            <div class="input-group">
+              <label>Nombre de usuario / Alias</label>
+              <input type="text" [(ngModel)]="nombre" placeholder="Jose Vega">
+            </div>
+            
+            <div class="input-group">
+              <label>Dirección de correo</label>
+              <input type="email" [value]="correo" disabled class="disabled-input">
+              <span class="helper-text">Protegido por LiveMarket. El correo no puede ser modificado.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Sección: Empresa (Dinámica) -->
+        @if (auth.esVendedorVista()) {
+          <div class="config-panel premium-panel">
+            <div class="panel-title-row">
+              <div class="panel-icon">🏢</div>
+              <h3>Datos de Vendedor</h3>
+            </div>
+            <p class="panel-desc">Información pública de tu negocio para las transmisiones.</p>
+            
+            <div class="input-group">
+              <label>Nombre de la Empresa</label>
+              <input type="text" [(ngModel)]="empresa.nombre_empresa" name="nombre_empresa" placeholder="Muebles Caribe">
+            </div>
+
+            <div class="grid-2">
+              <div class="input-group">
+                <label>Categoría de Negocio</label>
+                <select [(ngModel)]="empresa.categoria_negocio" name="categoria_negocio">
+                  <option value="">Seleccionar...</option>
+                  <option value="Fabricante">Fabricante</option>
+                  <option value="Distribuidor">Distribuidor</option>
+                  <option value="Tienda Minorista">Tienda Minorista</option>
+                  <option value="Servicios">Servicios</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label>Ubicación (Ciudad)</label>
+                <input type="text" [(ngModel)]="empresa.ubicacion" name="ubicacion" placeholder="Barranquilla, Atlántico">
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="input-group">
+                <label>Teléfono de Contacto</label>
+                <input type="text" [(ngModel)]="empresa.telefono_contacto" name="telefono_contacto" placeholder="+57 300 000 0000">
+              </div>
+              <div class="input-group">
+                <label>Correo de Negocio</label>
+                <input type="email" [(ngModel)]="empresa.correo_contacto" name="correo_contacto" placeholder="ventas@empresa.com">
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label>Horario de Atención</label>
+              <input type="text" [(ngModel)]="empresa.horario" name="horario" placeholder="Lun - Vie · 8am a 6pm">
+            </div>
+
+            <div class="input-group">
+              <label>Descripción del Negocio</label>
+              <textarea rows="3" [(ngModel)]="empresa.descripcion" name="descripcion" placeholder="Cuéntanos sobre tu negocio..."></textarea>
+            </div>
+
+            <div class="panel-divider"></div>
+            <h4>Logística y Pagos</h4>
+
+            <div class="grid-2">
+              <div class="input-group">
+                <label>Información de Envíos</label>
+                <input type="text" [(ngModel)]="empresa.info_envios" name="info_envios" placeholder="Envíos a todo el país">
+              </div>
+              <div class="input-group">
+                <label>Métodos de Pago</label>
+                <input type="text" [(ngModel)]="empresa.metodos_pago" name="metodos_pago" placeholder="Efectivo, Transferencia, TC">
+              </div>
+            </div>
+
+            <div class="panel-divider"></div>
+            <h4>Redes Sociales</h4>
+
+            <div class="grid-2">
+              <div class="input-group">
+                <label>Instagram (@usuario)</label>
+                <input type="text" [(ngModel)]="empresa.instagram" name="instagram" placeholder="muebles_caribe">
+              </div>
+              <div class="input-group">
+                <label>Facebook (URL o Nombre)</label>
+                <input type="text" [(ngModel)]="empresa.facebook" name="facebook" placeholder="mueblescaribeoficial">
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label>Sitio Web (URL)</label>
+              <input type="url" [(ngModel)]="empresa.url_web" name="url_web" placeholder="https://www.tuempresa.com">
+            </div>
+          </div>
+        } @else if (auth.esCompradorVista()) {
+          <div class="config-panel seller-request">
+            <div class="panel-title-row">
+              <div class="panel-icon">🚀</div>
+              <h3>¿Quieres vender en LiveMarket?</h3>
+            </div>
+            
+            @if (solicitudVendedor()) {
+              <div class="request-status" [class]="solicitudVendedor().estado">
+                @if (solicitudVendedor().estado === 'pendiente') {
+                  <div class="status-msg">
+                    <span class="status-ico">⏳</span>
+                    <p>Tu solicitud para ser vendedor está siendo revisada por un administrador.</p>
+                  </div>
+                } @else if (solicitudVendedor().estado === 'rechazada') {
+                  <div class="status-msg">
+                    <span class="status-ico">❌</span>
+                    <p>Tu solicitud fue rechazada. Puedes intentar enviar una nueva explicando mejor tu negocio.</p>
+                  </div>
+                  <div class="input-group mt-4">
+                    <textarea rows="2" [(ngModel)]="mensajeSolicitud" name="mensajeSolicitud" placeholder="Cuéntanos sobre tu negocio..."></textarea>
+                  </div>
+                  <button type="button" class="btn-premium-action mt-2" (click)="solicitarSerVendedor()" [disabled]="enviandoSolicitud()">
+                    Reintentar solicitud
+                  </button>
+                }
+              </div>
+            } @else {
+              <p class="panel-desc">Solicita tu cuenta de vendedor para empezar a transmitir en vivo y vender tus productos.</p>
+              <div class="input-group">
+                <textarea rows="2" [(ngModel)]="mensajeSolicitud" name="mensajeSolicitud" placeholder="Cuéntanos brevemente qué planeas vender..."></textarea>
+              </div>
+              <button type="button" class="btn-premium-action" (click)="solicitarSerVendedor()" [disabled]="enviandoSolicitud()">
+                {{ enviandoSolicitud() ? 'Enviando...' : 'Solicitar ser vendedor' }}
+              </button>
+            }
+          </div>
+        }
+
+        <!-- Sección: Seguridad Avanzada (2FA) -->
+        <section class="config-panel advanced-security-panel">
+          <div class="panel-content">
+            <div class="panel-title-row">
+              <div class="panel-icon mfa-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></svg>
+              </div>
+              <div class="title-with-badge">
+                <h3>Seguridad Avanzada</h3>
+                <span class="status-badge" [class.status-active]="twoFactorEnabled()">
+                  {{ twoFactorEnabled() ? 'Protegido' : 'Vulnerable' }}
+                </span>
+              </div>
+            </div>
+
+            <div class="security-feature-card">
+              <div class="feature-info">
+                <div class="feature-header">
+                  <h4>Verificación en dos pasos (2FA)</h4>
+                  <span class="recommendation-tag">Recomendado</span>
+                </div>
+                <p>Añade una capa extra de seguridad. Además de tu contraseña, se te pedirá un código único cada vez que inicies sesión.</p>
+                
+                <!-- MFA Enrollment UI -->
+                <div class="mfa-enrollment-flow" *ngIf="mfaStep() === 'enrolling'">
+                  <div class="qr-container">
+                    <img [src]="mfaQR()" alt="Código QR de seguridad" *ngIf="mfaQR()">
+                    <div class="secret-fallback">
+                      <small>Si no puedes escanear, usa esta clave:</small>
+                      <code>{{ mfaSecret() }}</code>
+                    </div>
+                  </div>
+                  
+                  <div class="mfa-verification-input">
+                    <label>Ingresa el código de tu app</label>
+                    <div class="code-row">
+                      <input type="text" [(ngModel)]="mfaCode" placeholder="000000" maxlength="6">
+                      <button class="btn-verify" (click)="confirmarMFA()" [disabled]="loading()">Verificar</button>
+                    </div>
+                    <button class="btn-cancel-link" (click)="cancelarMFA()">Cancelar</button>
+                  </div>
+                </div>
+
+                <!-- Modal de Confirmación Premium (MFA) -->
+                <div class="modal-overlay" *ngIf="showConfirmMFA()">
+                  <div class="modal-card fade-in">
+                    <div class="modal-icon warning">⚠️</div>
+                    <h3>¿Desactivar Seguridad 2FA?</h3>
+                    <p>Tu cuenta será menos segura y vulnerable a accesos no autorizados. ¿Estás seguro de que deseas continuar?</p>
+                    <div class="modal-actions">
+                      <button class="btn-ghost" (click)="closeMFAConfirm()">Mantener protegido</button>
+                      <button class="btn-danger" (click)="confirmDisable2FA()">Sí, desactivar</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Modal de Confirmación Premium (Eliminar Cuenta) -->
+                <div class="modal-overlay" *ngIf="showDeleteAccountConfirm()">
+                  <div class="modal-card fade-in">
+                    <div class="modal-icon critical">🛑</div>
+                    <h3>¿Eliminar cuenta permanentemente?</h3>
+                    <p>Esta acción no se puede deshacer. Se borrarán todos tus datos, productos y transmisiones de forma definitiva.</p>
+                    <div class="modal-actions">
+                      <button class="btn-ghost" (click)="closeDeleteConfirm()">Cancelar</button>
+                      <button class="btn-danger" (click)="confirmDeleteAccount()">Eliminar para siempre</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="feature-methods" *ngIf="twoFactorEnabled() && mfaStep() === 'none'">
+                  <div class="method-item">
+                    <div class="method-icon">�</div>
+                    <div class="method-details">
+                      <span class="method-label">App de autenticación</span>
+                      <span class="method-desc">Google Authenticator / Authy configurado</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="feature-action">
+                <label class="switch-premium">
+                  <input type="checkbox" [checked]="twoFactorEnabled()" (change)="toggle2FA()">
+                  <span class="slider-premium"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Sección: Preferencias -->
+        <section class="config-panel">
+          <div class="panel-content">
+            <div class="panel-title-row">
+              <div class="panel-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </div>
+              <h3>Preferencias</h3>
+            </div>
+            
+            <div class="preferences-list">
+              <div class="pref-item">
+                <div class="pref-info">
+                  <span class="pref-label">Notificaciones por correo</span>
+                  <p class="pref-desc">Recibe avisos de nuevas transmisiones</p>
+                </div>
+                <label class="switch-premium">
+                  <input type="checkbox" checked>
+                  <span class="slider-premium"></span>
+                </label>
+              </div>
+
+              <div class="pref-item">
+                <div class="pref-info">
+                  <span class="pref-label">Modo privado</span>
+                  <p class="pref-desc">Ocultar actividad en el feed público</p>
+                </div>
+                <label class="switch-premium">
+                  <input type="checkbox">
+                  <span class="slider-premium"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Columna Lateral -->
+      <aside class="side-col">
+        <!-- Seguridad -->
+        <section class="config-panel security-panel">
+          <div class="panel-content">
+            <div class="panel-title-row">
+              <div class="panel-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              </div>
+              <h3>Seguridad</h3>
+            </div>
+            
+            @if (provider === 'google') {
+              <div class="google-notice">
+                <div class="notice-icon">G</div>
+                <div class="notice-text">
+                  <strong>Cuenta vinculada a Google</strong>
+                  <p>Para mayor seguridad o para acceder sin Google, te recomendamos establecer una contraseña propia.</p>
+                </div>
+              </div>
+            } @else {
+              <p class="panel-desc">Establece una contraseña segura para tu acceso tradicional.</p>
+            }
+            
+            <div class="input-group">
+              <label>Nueva clave</label>
+              <input type="password" [(ngModel)]="nuevaPassword" placeholder="••••••••">
+            </div>
+            
+            <div class="input-group">
+              <label>Confirmar clave</label>
+              <input type="password" [(ngModel)]="confirmarPassword" placeholder="••••••••">
+            </div>
+            
+            <button class="btn-outline w-full" (click)="actualizarPassword()" [disabled]="loadingPass()">
+              {{ loadingPass() ? 'Procesando...' : 'Actualizar Contraseña' }}
+            </button>
+          </div>
+        </section>
+
+        <!-- Danger Zone -->
+        <section class="config-panel danger-panel">
+          <div class="panel-content">
+            <div class="panel-title-row">
+              <div class="panel-icon danger-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              </div>
+              <h3>Zona Crítica</h3>
+            </div>
+            <div class="danger-actions">
+              <button class="btn-logout" (click)="logout()">Cerrar sesión activa</button>
+              <button class="btn-delete-pro" (click)="eliminarCuenta()">Eliminar mi cuenta permanentemente</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Sesiones Activas -->
+        <section class="config-panel sessions-panel">
+          <div class="panel-content">
+            <div class="panel-title-row">
+              <div class="panel-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+              </div>
+              <h3>Dispositivos</h3>
+            </div>
+            <div class="sessions-list">
+              @for (s of sesiones(); track s.id) {
+                <div class="session-item" [class.current]="s.es_actual">
+                  <div class="session-info">
+                    <div class="session-header">
+                      <strong>{{ s.es_actual ? 'Este dispositivo' : 'Sesión Activa' }}</strong>
+                      <div class="online-indicator" *ngIf="s.es_actual"></div>
+                    </div>
+                    <p class="session-details">{{ s.ubicacion }} • {{ s.agente }}</p>
+                    <small class="session-time">{{ s.ultima_actividad | date:'short' }}</small>
+                  </div>
+                  <button class="btn-close-session" (click)="cerrarSesion(s.id)" title="Cerrar esta sesión">✕</button>
+                </div>
+              } @empty {
+                <p class="empty-text">No hay otras sesiones activas.</p>
+              }
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
   </div>
 </main>
 

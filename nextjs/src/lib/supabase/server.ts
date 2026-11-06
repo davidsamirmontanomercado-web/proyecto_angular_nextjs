@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 export function getSupabaseEnv() {
@@ -24,6 +25,28 @@ export function getSupabaseEnv() {
   }
 
   return { supabaseUrl, supabaseAnonKey };
+}
+
+/**
+ * Crea un cliente con la llave de servicio (admin).
+ * Usamos createClient directo de supabase-js para operaciones de backend que
+ * requieren saltarse RLS y gestionar usuarios, ya que es más robusto para 
+ * llaves de servicio que el cliente de SSR.
+ */
+export async function createAdminSupabase() {
+  const { supabaseUrl } = getSupabaseEnv();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY no está configurada en las variables de entorno.');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
 }
 
 export async function createServerSupabase() {
