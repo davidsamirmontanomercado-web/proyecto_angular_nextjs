@@ -11,9 +11,14 @@ export function OPTIONS(request: Request) {
   return CORS.empty(request);
 }
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const auth = await requireUser(request);
   if (!auth.ok) return CORS.json(request, { error: auth.mensaje }, auth.status);
+
+  const { id } = await params;
 
   try {
     const { data, error } = await auth.db
@@ -29,7 +34,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
           producto:productos(id, nombre, imagen)
         )
       `)
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (error) {
@@ -58,9 +63,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
  *                 metodo_pago): sólo el comprador y sólo si el pedido sigue
  *                 'pendiente'.
  */
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const auth = await requireUser(request);
   if (!auth.ok) return CORS.json(request, { error: auth.mensaje }, auth.status);
+
+  const { id } = await params;
 
   try {
     const body = await request.json();
@@ -70,7 +80,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { data: pedido, error: fetchErr } = await auth.db
       .from('pedidos')
       .select('comprador_id, vendedor_id, estado')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (fetchErr || !pedido) {
@@ -148,7 +158,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { data, error } = await auth.db
       .from('pedidos')
       .update(cambios)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single();
 
@@ -172,15 +182,20 @@ export async function PATCH(request: Request, { params }: { params: { id: string
  *  - El comprador puede eliminar pedidos pendientes o cancelados.
  *  - El vendedor sólo puede eliminar pedidos cancelados.
  */
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const auth = await requireUser(request);
   if (!auth.ok) return CORS.json(request, { error: auth.mensaje }, auth.status);
+
+  const { id } = await params;
 
   try {
     const { data: pedido, error: fetchErr } = await auth.db
       .from('pedidos')
       .select('comprador_id, vendedor_id, estado')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (fetchErr || !pedido) {
@@ -202,7 +217,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       return CORS.json(request, { error: 'El vendedor sólo puede eliminar pedidos cancelados.' }, 400);
     }
 
-    const { error } = await auth.db.from('pedidos').delete().eq('id', params.id);
+    const { error } = await auth.db.from('pedidos').delete().eq('id', id);
 
     if (error) {
       console.error('[Pedido DELETE] Error:', error);

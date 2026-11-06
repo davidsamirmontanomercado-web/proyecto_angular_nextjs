@@ -211,16 +211,16 @@ export async function PATCH(request: Request) {
     // Si el UPDATE no encontró al usuario (raro), lo creamos
     if (!updatedRows || updatedRows.length === 0) {
       console.log(`[Admin Usuarios PATCH] Usuario no encontrado en tabla pública, creando registro para: ${email}`);
-      await admin.from('usuarios').upsert(
-        {
-          id,
-          correo: email,
-          rol,
-          tipo_cuenta: rol,
-          nombre: userMetadata.nombre || userMetadata.full_name || 'Usuario'
-        },
-        { onConflict: 'id' }   // 👈 segundo argumento de opciones
-      );
+      await (admin.from('usuarios') as any).upsert(
+  {
+    id,
+    correo: email,
+    rol,
+    tipo_cuenta: rol,
+    nombre: userMetadata.nombre || userMetadata.full_name || 'Usuario'
+  },
+  { onConflict: 'id' }
+);
     }
 
     console.log(`[Admin Usuarios PATCH] ¡Sincronización completada para ${email}!`);

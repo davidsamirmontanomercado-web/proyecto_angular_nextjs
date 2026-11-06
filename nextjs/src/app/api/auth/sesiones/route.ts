@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   try {
     const userAgent = request.headers.get('user-agent') || '';
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
+
     // Análisis del dispositivo actual
     let dispositivo = 'Dispositivo desconocido';
     let sistema = 'Sistema desconocido';
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     else if (userAgent.includes('Macintosh')) sistema = 'macOS';
     else if (userAgent.includes('Android')) sistema = 'Android';
     else if (userAgent.includes('iPhone') || userAgent.includes('iPad')) sistema = 'iOS';
-    
+
     if (userAgent.includes('Chrome')) dispositivo = 'Google Chrome';
     else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) dispositivo = 'Safari';
     else if (userAgent.includes('Firefox')) dispositivo = 'Mozilla Firefox';
@@ -36,19 +36,27 @@ export async function GET(request: Request) {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
 
     // Si tenemos la llave, intentamos obtener sesiones reales
+    // Si tenemos la llave, intentamos obtener sesiones reales
     if (serviceRoleKey) {
       try {
         const admin = await createAdminSupabase();
-        // Consultamos la tabla interna de sesiones de Supabase Auth
-        const { data: dbSessions, error } = await admin
+        // Consultamos la tabla interna de sesiones de Supabase Auth.
+        // IMPORTANTE: .schema() va ANTES de .from() en supabase-js
+        const { data: dbSessions, error } = await (admin as any)
+          .schema('auth')
           .from('sessions')
           .select('*')
-          .eq('user_id', auth.usuario.id)
-          .schema('auth');
+          .eq('user_id', auth.usuario.id);
 
         if (!error && dbSessions) {
-          const sesionesMap = dbSessions.map(s => {
-            const isActual = s.id === (auth.usuario as any).session_id; // Supabase suele inyectar esto en el usuario
+          const sesionesMap = (dbSessions as Array<{
+            id: string;
+            ip: string | null;
+            user_agent: string | null;
+            updated_at: string | null;
+            created_at: string;
+          }>).map((s) => {
+            const isActual = s.id === (auth.usuario as any).session_id;
             return {
               id: s.id,
               es_actual: isActual,
