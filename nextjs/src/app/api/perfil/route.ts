@@ -153,8 +153,7 @@ export async function PATCH(request: Request) {
           url_web: perfilEmpresa.url_web,
           instagram: perfilEmpresa.instagram,
           facebook: perfilEmpresa.facebook,
-          // Asegurar que el usuario_id no cambie
-          usuario_id: userId 
+          
         });
 
       if (empError) {

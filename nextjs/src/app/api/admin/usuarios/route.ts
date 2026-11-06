@@ -212,15 +212,15 @@ export async function PATCH(request: Request) {
     if (!updatedRows || updatedRows.length === 0) {
       console.log(`[Admin Usuarios PATCH] Usuario no encontrado en tabla pública, creando registro para: ${email}`);
       await (admin.from('usuarios') as any).upsert(
-  {
-    id,
-    correo: email,
-    rol,
-    tipo_cuenta: rol,
-    nombre: userMetadata.nombre || userMetadata.full_name || 'Usuario'
-  },
-  { onConflict: 'id' }
-);
+        {
+          id,
+          correo: email,
+          rol,
+          tipo_cuenta: rol,
+          nombre: userMetadata.nombre || userMetadata.full_name || 'Usuario'
+        },
+        { onConflict: 'id' }
+      );
     }
 
     console.log(`[Admin Usuarios PATCH] ¡Sincronización completada para ${email}!`);
@@ -228,7 +228,7 @@ export async function PATCH(request: Request) {
       ok: true,
       mensaje: 'Rol actualizado y sincronizado.',
       rol_confirmado: rol
-    });
+    }, 200);
   } catch (err) {
     console.error('[Admin Usuarios PATCH] Error inesperado:', err);
     return CORS.json(request, { error: 'Error interno del servidor.' }, 500);
