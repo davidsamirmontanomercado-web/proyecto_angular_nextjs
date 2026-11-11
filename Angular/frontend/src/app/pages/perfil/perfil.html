@@ -217,17 +217,9 @@
           </div>
         }
 
-        <div class="catalog-header-pro mt-12">
-          <h2>Catálogo Destacado</h2>
-          <a routerLink="/vendedor/productos" class="link-pro-btn">Gestionar Todo →</a>
-        </div>
-        
-        <div class="empty-state-premium">
-          <div class="empty-art">🛍️</div>
-          <h3>Tu vitrina está vacía</h3>
-          <p>Sube tus mejores productos para que tus clientes puedan comprarlos durante tus transmisiones.</p>
-          <button class="btn btn-premium">Subir Primer Producto</button>
-        </div>
+        @if (auth.currentUser()?.rol === 'vendedor') {
+          <app-vendedor-productos [embedded]="true"></app-vendedor-productos>
+        }
       </div>
     }
 

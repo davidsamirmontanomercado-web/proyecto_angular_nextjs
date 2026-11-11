@@ -5,7 +5,7 @@ import { NavbarComponent } from '../../shared/navbar/navbar';
 import { FooterComponent } from '../../shared/footer/footer';
 import { AuthService } from '../../services/auth.service';
 import { ProductosService, Producto } from '../../services/productos.service';
-import { CategoriasService } from '../../services/categorias.service';
+import { CategoriasService, Categoria } from '../../services/categorias.service';
 import { PedidosService } from '../../services/pedidos.service';
 import { ToastService } from '../../services/toast.service';
 import { Router } from '@angular/router';
@@ -38,7 +38,7 @@ export class ComprarProductosComponent implements OnInit {
   private router = inject(Router);
 
   productos = signal<Producto[]>([]);
-  categorias = signal<string[]>([]);
+  categorias = signal<Categoria[]>([]);
   vendedores = signal<{ id: string; nombre: string }[]>([]);
   cargando = signal(true);
   enviandoPedido = signal(false);
@@ -74,7 +74,7 @@ export class ComprarProductosComponent implements OnInit {
   };
 
   carrito = signal<ItemCarrito[]>([]);
-  cantidades = new Map<number, number>();
+  cantidades = new Map<string, number>();
 
   ngOnInit() {
     this.cargarProductos();
@@ -120,7 +120,7 @@ export class ComprarProductosComponent implements OnInit {
 
   cargarCategorias() {
     this.categoriasService.getCategorias().subscribe({
-      next: (res) => this.categorias.set(res.map(c => c.nombre))
+      next: (res) => this.categorias.set(res)
     });
   }
 
@@ -130,8 +130,8 @@ export class ComprarProductosComponent implements OnInit {
       next: (res) => {
         const mapa = new Map<string, string>();
         res.data.forEach(p => {
-          if (p.vendedor?.id && p.vendedor?.nombre) {
-            mapa.set(p.vendedor.id, p.vendedor.nombre);
+          if (p.vendedor_id && p.vendedor_nombre) {
+            mapa.set(p.vendedor_id, p.vendedor_nombre);
           }
         });
         this.vendedores.set(
@@ -176,11 +176,11 @@ export class ComprarProductosComponent implements OnInit {
   get carritoPorEmpresa(): GrupoEmpresa[] {
     const grupos = new Map<string, GrupoEmpresa>();
     for (const item of this.carrito()) {
-      const id = item.producto.vendedor_id;
+      const id = item.producto.vendedor_id || '';
       if (!grupos.has(id)) {
         grupos.set(id, {
           vendedorId: id,
-          vendedorNombre: item.producto.vendedor?.nombre || 'Empresa',
+          vendedorNombre: item.producto.vendedor_nombre || item.producto.vendedor?.nombre || 'Empresa',
           items: [],
           subtotal: 0
         });
@@ -302,7 +302,7 @@ export class ComprarProductosComponent implements OnInit {
     return this.carrito().reduce((sum, item) => sum + (item.producto.precio * item.cantidad), 0);
   }
 
-  setCantidad(prodId: number, val: number) {
+  setCantidad(prodId: string, val: number) {
     if (val > 0) this.cantidades.set(prodId, val);
   }
 }

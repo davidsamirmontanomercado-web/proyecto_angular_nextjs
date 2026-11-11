@@ -30,8 +30,8 @@
         <label>Categoría</label>
         <select [(ngModel)]="filtros.categoria" (change)="aplicarFiltros()">
           <option value="">Todas las categorías</option>
-          @for (cat of categorias(); track cat) {
-            <option [value]="cat">{{ cat }}</option>
+          @for (cat of categorias(); track cat.id) {
+            <option [value]="cat.id">{{ cat.nombre }}</option>
           }
         </select>
       </div>
@@ -75,7 +75,7 @@
     <section class="products-section">
       <div class="section-title">
         <span>✨</span> 
-        {{ filtros.q ? 'Resultados para "' + filtros.q + '"' : 'Productos destacados' }}
+        {{ filtros.q ? 'Resultados para "' + filtros.q + '"' : 'Productos disponibles' }}
       </div>
       
       @if (cargando()) {
@@ -95,19 +95,23 @@
           @for (p of productos(); track p.id) {
             <div class="product-card">
               <div class="product-img">
-                <img [src]="p.imagen" [alt]="p.nombre" loading="lazy">
+                @if (p.imagen || p.imagenes?.[0]) {
+                  <img [src]="p.imagen || p.imagenes?.[0]" [alt]="p.nombre" loading="lazy">
+                } @else {
+                  <div class="product-image-empty" aria-label="Producto sin imagen">📦</div>
+                }
                 <span class="product-cat">{{ p.categoria }}</span>
-                @if (p.tag) {
-                  <span class="product-cat" style="right: 16px; left: auto; background: var(--text); color: #fff;">{{ p.tag }}</span>
+                @if (p.etiquetas?.length) {
+                  <span class="product-cat" style="right: 16px; left: auto; background: var(--text); color: #fff;">{{ p.etiquetas?.[0] }}</span>
                 }
               </div>
               <div class="product-info">
                 <h3>{{ p.nombre }}</h3>
                 <p class="product-desc">{{ p.descripcion }}</p>
-                <div class="product-vendedor" *ngIf="p.vendedor">
-                  <span class="ic">🏪</span> {{ p.vendedor.nombre }}
+                <div class="product-vendedor" *ngIf="p.vendedor_nombre">
+                  <span class="ic">🏪</span> {{ p.vendedor_nombre }}
                 </div>
-                <span class="price">{{ p.precio | currency:'USD':'symbol':'1.0-0' }}</span>
+                <span class="price">{{ p.precio | currency:(p.moneda || 'COP'):'symbol-narrow':'1.0-0' }}</span>
                 
                 <div class="purchase-actions">
                   <div class="qty-input">
@@ -115,8 +119,12 @@
                     <input type="number" [ngModel]="cantidades.get(p.id)" (ngModelChange)="setCantidad(p.id, $event)" min="1" readonly>
                     <button (click)="setCantidad(p.id, (cantidades.get(p.id) || 1) + 1)" aria-label="Aumentar cantidad">+</button>
                   </div>
-                  <button class="btn-add" (click)="agregarAlCarrito(p)">
+                    <button class="btn-add" (click)="agregarAlCarrito(p)" [disabled]="p.stock <= 0">
+                    @if (p.stock > 0) {
                     Añadir
+                    } @else {
+                    Agotado
+                    }
                   </button>
                 </div>
               </div>
@@ -144,10 +152,14 @@
           } @else {
             @for (item of carrito(); track $index) {
               <div class="cart-item">
-                <img [src]="item.producto.imagen" [alt]="item.producto.nombre" class="item-thumb">
+                @if (item.producto.imagen || item.producto.imagenes?.[0]) {
+                  <img [src]="item.producto.imagen || item.producto.imagenes?.[0]" [alt]="item.producto.nombre" class="item-thumb">
+                } @else {
+                  <div class="item-thumb item-thumb-empty" aria-label="Producto sin imagen">📦</div>
+                }
                 <div class="item-details">
                   <h4>{{ item.producto.nombre }}</h4>
-                  <p class="item-price">{{ item.producto.precio | currency:'USD':'symbol':'1.0-0' }} x {{ item.cantidad }}</p>
+                  <p class="item-price">{{ item.producto.precio | currency:(item.producto.moneda || 'COP'):'symbol-narrow':'1.0-0' }} x {{ item.cantidad }}</p>
                   
                   <div class="item-actions">
                     <div class="qty-small">
@@ -161,7 +173,7 @@
                   </div>
                 </div>
                 <div class="item-total">
-                  {{ (item.producto.precio * item.cantidad) | currency:'USD':'symbol':'1.0-0' }}
+                {{ (item.producto.precio * item.cantidad) | currency:(item.producto.moneda || 'COP'):'symbol-narrow':'1.0-0' }}
                 </div>
               </div>
             }
@@ -172,7 +184,7 @@
           <div class="cart-footer">
             <div class="total-row">
               <span class="total-label">Subtotal estimado</span>
-              <span class="total-price">{{ total | currency:'USD':'symbol':'1.0-0' }}</span>
+              <span class="total-price">{{ total | currency:'COP':'symbol-narrow':'1.0-0' }}</span>
             </div>
             <p class="empresas-nota">
               🏪 Se enviará a {{ carritoPorEmpresa.length }} empresa(s)
@@ -294,12 +306,12 @@
                 <div class="review-card mt-3">
                   <div class="empresa-head">
                     <strong>{{ grupo.vendedorNombre }}</strong>
-                    <span>{{ grupo.subtotal | currency:'USD':'symbol':'1.0-0' }}</span>
+                  <span>{{ grupo.subtotal | currency:'COP':'symbol-narrow':'1.0-0' }}</span>
                   </div>
                   @for (item of grupo.items; track item.producto.id) {
                     <div class="review-item">
                       <span>{{ item.cantidad }}x {{ item.producto.nombre }}</span>
-                      <strong>{{ (item.producto.precio * item.cantidad) | currency:'USD':'symbol':'1.0-0' }}</strong>
+                    <strong>{{ (item.producto.precio * item.cantidad) | currency:'COP':'symbol-narrow':'1.0-0' }}</strong>
                     </div>
                   }
                 </div>
@@ -308,7 +320,7 @@
 
             <div class="review-total mt-6">
               <span>Total del pedido</span>
-              <strong>{{ total | currency:'USD':'symbol':'1.0-0' }}</strong>
+              <strong>{{ total | currency:'COP':'symbol-narrow':'1.0-0' }}</strong>
             </div>
           </div>
 

@@ -6,13 +6,14 @@ import { FooterComponent } from '../../shared/footer/footer';
 import { PerfilService, PerfilData } from '../../services/perfil.service';
 import { PedidosService, Pedido } from '../../services/pedidos.service';
 import { ToastService } from '../../services/toast.service';
+import { VendedorProductosComponent } from '../vendedor-productos/vendedor-productos';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-perfil',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, NavbarComponent, FooterComponent],
+  imports: [CommonModule, FormsModule, RouterLink, NavbarComponent, FooterComponent, VendedorProductosComponent],
   templateUrl: './perfil.html',
   styleUrl: './perfil.css'
 })
