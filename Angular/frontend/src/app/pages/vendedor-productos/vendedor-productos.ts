@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, Input, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Categoria, CategoriasService } from '../../services/categorias.service';
 import { Producto, ProductoPayload, ProductosService } from '../../services/productos.service';
@@ -9,6 +9,8 @@ type ProductoForm = Omit<ProductoPayload, 'descripcion' | 'subcategoria' | 'imag
   descripcion: string;
   subcategoria: string;
   imagenes: string[];
+  imagenUrl: string;
+  moneda: string;
   garantia: string;
   entrega: string;
   estado_publicacion: 'activo' | 'inactivo';
@@ -24,6 +26,7 @@ type ProductoForm = Omit<ProductoPayload, 'descripcion' | 'subcategoria' | 'imag
 })
 export class VendedorProductosComponent implements OnInit {
   @Input() embedded = false;
+  @ViewChild('listaProductosVendedor') private listaProductosVendedor?: ElementRef<HTMLElement>;
 
   private productosService = inject(ProductosService);
   private categoriasService = inject(CategoriasService);
@@ -54,7 +57,9 @@ export class VendedorProductosComponent implements OnInit {
       categoria_id: '',
       subcategoria: '',
       precio: 0,
+      moneda: 'COP',
       imagenes: [],
+      imagenUrl: '',
       condicion: 'nuevo',
       stock: 1,
       garantia: '',
@@ -93,7 +98,9 @@ export class VendedorProductosComponent implements OnInit {
       categoria_id: producto.categoria_id,
       subcategoria: producto.subcategoria ?? '',
       precio: Number(producto.precio),
+      moneda: producto.moneda || 'COP',
       imagenes: [...(producto.imagenes ?? [])],
+      imagenUrl: '',
       condicion: producto.condicion || 'nuevo',
       stock: Number(producto.stock ?? 0),
       garantia: producto.garantia ?? '',
@@ -150,6 +157,35 @@ export class VendedorProductosComponent implements OnInit {
     }
   }
 
+  agregarImagenUrl(): void {
+    const valor = this.form.imagenUrl.trim();
+    if (!valor) return;
+
+    let url: URL;
+    try {
+      url = new URL(valor);
+    } catch {
+      this.toast.info('Escribe una URL de imagen válida.');
+      return;
+    }
+
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      this.toast.info('La imagen debe usar una URL HTTP o HTTPS.');
+      return;
+    }
+    if (this.form.imagenes.length >= 5) {
+      this.toast.info('Puedes agregar hasta 5 imágenes por producto.');
+      return;
+    }
+
+    this.form.imagenes = [...this.form.imagenes, url.href];
+    this.form.imagenUrl = '';
+  }
+
+  gestionarTodo(): void {
+    this.listaProductosVendedor?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   quitarImagen(indice: number): void {
     this.form.imagenes = this.form.imagenes.filter((_, i) => i !== indice);
   }
@@ -178,11 +214,13 @@ export class VendedorProductosComponent implements OnInit {
       categoria_id: this.form.categoria_id,
       subcategoria: this.form.subcategoria?.trim() || null,
       precio: Number(this.form.precio),
+      moneda: this.form.moneda,
       imagenes: this.form.imagenes,
       condicion: this.form.condicion,
       stock: Number(this.form.stock),
       garantia: this.form.garantia?.trim() || null,
       entrega: this.form.entrega?.trim() || null,
+      estado_publicacion: this.form.estado_publicacion,
       etiquetas: this.form.etiquetasTexto
         .split(',')
         .map((tag) => tag.trim())

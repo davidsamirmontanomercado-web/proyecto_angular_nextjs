@@ -1,4 +1,13 @@
 /* ============ VENDEDOR (Storefront Design) ============ */
+.seller-experience.fade-in {
+  animation: sellerExperienceFadeIn 0.45s var(--ease) both;
+}
+
+@keyframes sellerExperienceFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .profile-hero {
   position: relative;
   background: var(--bg-elev);

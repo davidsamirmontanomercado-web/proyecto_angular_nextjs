@@ -67,6 +67,10 @@
           </div>
         </div>
 
+        @if (auth.currentUser()?.rol === 'vendedor') {
+          <app-vendedor-productos [embedded]="true"></app-vendedor-productos>
+        }
+
         <div class="pro-layout-grid">
           <div class="panel business-info-pro">
             <div class="panel-header-pro">
@@ -217,9 +221,6 @@
           </div>
         }
 
-        @if (auth.currentUser()?.rol === 'vendedor') {
-          <app-vendedor-productos [embedded]="true"></app-vendedor-productos>
-        }
       </div>
     }
 

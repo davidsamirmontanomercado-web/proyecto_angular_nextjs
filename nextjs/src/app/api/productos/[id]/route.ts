@@ -2,6 +2,7 @@ import { cors, requireRole, requireUser, mapErrorBD } from '@/lib/api/http';
 
 const CORS = cors('PATCH, DELETE, OPTIONS');
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MONEDAS_VALIDAS = new Set(['COP', 'USD', 'EUR']);
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -70,6 +71,13 @@ export async function PATCH(request: Request, context: RouteContext) {
         return CORS.json(request, { error: 'El precio debe ser mayor que cero.' }, 400);
       }
       updates['precio'] = precio;
+    }
+    if ('moneda' in body) {
+      const moneda = typeof body['moneda'] === 'string' ? body['moneda'].trim().toUpperCase() : '';
+      if (!MONEDAS_VALIDAS.has(moneda)) {
+        return CORS.json(request, { error: 'Selecciona una moneda válida.' }, 400);
+      }
+      updates['moneda'] = moneda;
     }
     if ('categoria_id' in body) {
       const categoriaId = typeof body['categoria_id'] === 'string' ? body['categoria_id'] : '';

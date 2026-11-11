@@ -4,6 +4,7 @@ import { getSupabaseEnv } from '@/lib/supabase/server';
 
 const CORS = cors('GET, POST, OPTIONS');
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MONEDAS_VALIDAS = new Set(['COP', 'USD', 'EUR']);
 
 function createAnonSupabase() {
   const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
@@ -131,14 +132,18 @@ export async function POST(request: Request) {
     const body = await request.json() as Record<string, unknown>;
     const nombre = typeof body['nombre'] === 'string' ? body['nombre'].trim() : '';
     const precio = Number(body['precio']);
+    const moneda = typeof body['moneda'] === 'string' ? body['moneda'].trim().toUpperCase() : 'COP';
     const categoriaId = typeof body['categoria_id'] === 'string' ? body['categoria_id'] : '';
     const stock = Number(body['stock'] ?? 0);
     const imagenes = Array.isArray(body['imagenes']) ? body['imagenes'] : [];
     const etiquetas = Array.isArray(body['etiquetas']) ? body['etiquetas'] : [];
+    const estadoPublicacion = body['estado_publicacion'] ?? 'activo';
 
     if (!nombre || nombre.length > 160 || !Number.isFinite(precio) || precio <= 0 ||
-        !UUID_RE.test(categoriaId) || !Number.isInteger(stock) || stock < 0) {
-      return CORS.json(request, { error: 'Revisa el nombre, categoría, precio y stock del producto.' }, 400);
+        !UUID_RE.test(categoriaId) || !Number.isInteger(stock) || stock < 0 ||
+        !MONEDAS_VALIDAS.has(moneda) ||
+        (estadoPublicacion !== 'activo' && estadoPublicacion !== 'inactivo')) {
+      return CORS.json(request, { error: 'Revisa nombre, categoría, precio, moneda, stock y estado de publicación.' }, 400);
     }
     if (imagenes.length > 5 || imagenes.some((img) => typeof img !== 'string') ||
         JSON.stringify(imagenes).length > 3_500_000) {
@@ -178,14 +183,14 @@ export async function POST(request: Request) {
         categoria_id: categoriaId,
         subcategoria: typeof body['subcategoria'] === 'string' ? body['subcategoria'].trim() || null : null,
         precio,
-        moneda: 'COP',
+        moneda,
         imagenes,
         condicion: typeof body['condicion'] === 'string' ? body['condicion'] : 'nuevo',
         stock,
         garantia: typeof body['garantia'] === 'string' ? body['garantia'].trim() || null : null,
         entrega: typeof body['entrega'] === 'string' ? body['entrega'].trim() || null : null,
         etiquetas,
-        estado_publicacion: 'activo',
+        estado_publicacion: estadoPublicacion,
         fecha_actualizacion: new Date().toISOString()
       })
       .select()

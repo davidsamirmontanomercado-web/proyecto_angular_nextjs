@@ -2,55 +2,60 @@
   <div class="products-heading">
     <div>
       <span class="products-eyebrow">Tu escaparate</span>
-      <h2>Productos de la tienda</h2>
-      <p>Publica y administra los productos que verán tus clientes.</p>
+      <h2>Catálogo destacado</h2>
+      <p>Publica y administra los productos que tus clientes pueden comprar.</p>
     </div>
-    <button type="button" class="products-primary" (click)="abrirCrear()">＋ Nuevo producto</button>
+    <div class="products-heading-actions">
+      <button type="button" class="products-secondary" (click)="gestionarTodo()">Gestionar todo →</button>
+      <button type="button" class="products-primary" (click)="abrirCrear()">＋ Subir producto</button>
+    </div>
   </div>
 
-  @if (cargando()) {
-    <div class="products-state">
-      <span class="products-spinner"></span>
-      <p>Cargando tus productos…</p>
-    </div>
-  } @else if (productos().length === 0) {
-    <div class="products-empty">
-      <span class="empty-icon">▧</span>
-      <h3>Tu tienda empieza aquí</h3>
-      <p>Añade un producto y publícalo para que aparezca en el catálogo.</p>
-      <button type="button" class="products-primary" (click)="abrirCrear()">Publicar primer producto</button>
-    </div>
-  } @else {
-    <div class="seller-product-grid">
-      @for (producto of productos(); track producto.id) {
-        <article class="seller-product-card">
-          <div class="seller-product-photo">
-            @if (imagenPrincipal(producto); as imagen) {
-              <img [src]="imagen" [alt]="producto.nombre" loading="lazy">
-            } @else {
-              <span aria-label="Producto sin imagen">📦</span>
-            }
-            <span class="publication-pill" [class.paused]="producto.estado_publicacion !== 'activo'">
-              {{ producto.estado_publicacion === 'activo' ? 'Publicado' : 'Pausado' }}
-            </span>
-          </div>
-          <div class="seller-product-info">
-            <div class="seller-product-category">{{ nombreCategoria(producto.categoria_id) }}</div>
-            <h3>{{ producto.nombre }}</h3>
-            <p class="seller-product-description">{{ producto.descripcion || 'Sin descripción' }}</p>
-            <div class="seller-product-meta">
-              <strong>{{ producto.precio | currency:(producto.moneda || 'COP'):'symbol-narrow':'1.0-0' }}</strong>
-              <span>{{ producto.stock }} disponibles</span>
+  <div #listaProductosVendedor>
+    @if (cargando()) {
+      <div class="products-state">
+        <span class="products-spinner"></span>
+        <p>Cargando tus productos…</p>
+      </div>
+    } @else if (productos().length === 0) {
+      <div class="products-empty">
+        <span class="empty-icon">▧</span>
+        <h3>Tu vitrina está vacía</h3>
+        <p>Sube tus mejores productos para que tus clientes puedan comprarlos durante tus transmisiones.</p>
+        <button type="button" class="products-primary" (click)="abrirCrear()">Subir primer producto</button>
+      </div>
+    } @else {
+      <div class="seller-product-grid">
+        @for (producto of productos(); track producto.id) {
+          <article class="seller-product-card">
+            <div class="seller-product-photo">
+              @if (imagenPrincipal(producto); as imagen) {
+                <img [src]="imagen" [alt]="producto.nombre" loading="lazy">
+              } @else {
+                <span aria-label="Producto sin imagen">📦</span>
+              }
+              <span class="publication-pill" [class.paused]="producto.estado_publicacion !== 'activo'">
+                {{ producto.estado_publicacion === 'activo' ? 'Publicado' : 'Pausado' }}
+              </span>
             </div>
-            <div class="seller-product-actions">
-              <button type="button" class="products-secondary" (click)="abrirEdicion(producto)">Editar</button>
-              <button type="button" class="products-delete" (click)="pedirEliminar(producto)" aria-label="Eliminar producto">Eliminar</button>
+            <div class="seller-product-info">
+              <div class="seller-product-category">{{ nombreCategoria(producto.categoria_id) }}</div>
+              <h3>{{ producto.nombre }}</h3>
+              <p class="seller-product-description">{{ producto.descripcion || 'Sin descripción' }}</p>
+              <div class="seller-product-meta">
+                <strong>{{ producto.precio | currency:(producto.moneda || 'COP'):'symbol-narrow':'1.0-0' }}</strong>
+                <span>{{ producto.stock }} disponibles</span>
+              </div>
+              <div class="seller-product-actions">
+                <button type="button" class="products-secondary" (click)="abrirEdicion(producto)">Editar</button>
+                <button type="button" class="products-delete" (click)="pedirEliminar(producto)" aria-label="Eliminar producto">Eliminar</button>
+              </div>
             </div>
-          </div>
-        </article>
-      }
-    </div>
-  }
+          </article>
+        }
+      </div>
+    }
+  </div>
 </section>
 
 @if (modalAbierto()) {
@@ -69,7 +74,7 @@
         <button type="button" class="product-modal-close" (click)="cerrarModal()" aria-label="Cerrar">×</button>
       </header>
 
-      <form class="product-form" (ngSubmit)="guardarProducto()">
+      <form id="product-form" class="product-form" (ngSubmit)="guardarProducto()">
         <label class="product-field">
           <span>Nombre del producto *</span>
           <input name="nombre" [(ngModel)]="form.nombre" maxlength="160" required placeholder="Ej. Audífonos inalámbricos">
@@ -107,16 +112,24 @@
 
         <div class="product-form-row">
           <label class="product-field">
-            <span>Precio (COP) *</span>
+            <span>Precio *</span>
             <input name="precio" type="number" [(ngModel)]="form.precio" min="1" step="1" required>
           </label>
           <label class="product-field">
-            <span>Unidades disponibles *</span>
-            <input name="stock" type="number" [(ngModel)]="form.stock" min="0" step="1" required>
+            <span>Moneda</span>
+            <select name="moneda" [(ngModel)]="form.moneda">
+              <option value="COP">COP - Peso colombiano</option>
+              <option value="USD">USD - Dólar estadounidense</option>
+              <option value="EUR">EUR - Euro</option>
+            </select>
           </label>
         </div>
 
         <div class="product-form-row">
+          <label class="product-field">
+            <span>Unidades disponibles *</span>
+            <input name="stock" type="number" [(ngModel)]="form.stock" min="0" step="1" required>
+          </label>
           <label class="product-field">
             <span>Condición</span>
             <select name="condicion" [(ngModel)]="form.condicion">
@@ -125,16 +138,18 @@
               <option value="reacondicionado">Reacondicionado</option>
             </select>
           </label>
+        </div>
+
+        <div class="product-form-row">
           <label class="product-field">
             <span>Garantía</span>
             <input name="garantia" [(ngModel)]="form.garantia" placeholder="Ej. 6 meses">
           </label>
+          <label class="product-field">
+            <span>Información de entrega</span>
+            <input name="entrega" [(ngModel)]="form.entrega" placeholder="Ej. Envío nacional">
+          </label>
         </div>
-
-        <label class="product-field">
-          <span>Información de entrega</span>
-          <input name="entrega" [(ngModel)]="form.entrega" placeholder="Ej. Envío nacional">
-        </label>
 
         <label class="product-field">
           <span>Etiquetas</span>
@@ -144,10 +159,19 @@
 
         <div class="product-field">
           <span>Imágenes</span>
+          <div class="image-url-row">
+            <input
+              name="imagenUrl"
+              type="url"
+              [(ngModel)]="form.imagenUrl"
+              placeholder="https://ejemplo.com/imagen.jpg"
+              aria-label="URL de la imagen del producto">
+            <button type="button" class="products-secondary" (click)="agregarImagenUrl()">Agregar URL</button>
+          </div>
           <label class="image-picker">
             <input type="file" accept="image/*" multiple (change)="agregarImagenes($event)">
             <span>＋ Seleccionar imágenes</span>
-            <small>Hasta 5 imágenes, máximo 1,5 MB cada una.</small>
+            <small>También puedes seleccionar archivos. Hasta 5 imágenes en total.</small>
           </label>
           @if (form.imagenes.length > 0) {
             <div class="product-image-previews">
@@ -161,20 +185,22 @@
           }
         </div>
 
-        @if (productoEditando()) {
-          <label class="publication-toggle">
-            <input type="checkbox" name="publicado" [ngModel]="form.estado_publicacion === 'activo'" (ngModelChange)="form.estado_publicacion = $event ? 'activo' : 'inactivo'">
-            <span>Visible en la tienda</span>
-          </label>
-        }
+        <label class="product-field">
+          <span>Estado de publicación</span>
+          <select name="estado_publicacion" [(ngModel)]="form.estado_publicacion">
+            <option value="activo">Publicado (visible en la tienda)</option>
+            <option value="inactivo">Pausado (oculto en la tienda)</option>
+          </select>
+        </label>
 
-        <footer class="product-modal-actions">
-          <button type="button" class="products-secondary" (click)="cerrarModal()" [disabled]="guardando()">Cancelar</button>
-          <button type="submit" class="products-primary" [disabled]="guardando()">
-            {{ guardando() ? 'Guardando…' : (productoEditando() ? 'Guardar cambios' : 'Publicar producto') }}
-          </button>
-        </footer>
       </form>
+
+      <footer class="product-modal-actions product-form-actions">
+        <button type="button" class="products-secondary" (click)="cerrarModal()" [disabled]="guardando()">Cancelar</button>
+        <button type="submit" form="product-form" class="products-primary" [disabled]="guardando()">
+          {{ guardando() ? 'Guardando…' : (productoEditando() ? 'Guardar cambios' : 'Publicar producto') }}
+        </button>
+      </footer>
     </section>
   </div>
 }

@@ -44,7 +44,7 @@ export type ProductoPayload = Pick<
   | 'garantia'
   | 'entrega'
   | 'etiquetas'
->;
+> & Partial<Pick<Producto, 'moneda' | 'estado_publicacion'>>;
 
 @Injectable({
   providedIn: 'root'
