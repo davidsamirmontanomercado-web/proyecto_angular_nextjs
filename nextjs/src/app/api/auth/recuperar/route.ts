@@ -1,4 +1,4 @@
-import { cors, leerCuerpoJson } from '@/lib/api/http';
+import { cors, leerCuerpoJson, getBaseUrl } from '@/lib/api/http';
 import { createAdminSupabase, createServerSupabase } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/mailersend';
 
@@ -17,7 +17,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
+    // Se deriva del host real de la petición (dominio estable), no de SITE_URL,
+    // para que el enlace de recuperación no apunte a un deployment temporal.
+    const siteUrl = getBaseUrl(request);
     const callbackUrl = `${siteUrl.replace(/\/+$/, '')}/api/auth/callback?type=recovery`;
 
     // INTENTO 1: Usar el servicio de correo nativo de Supabase (más sencillo)

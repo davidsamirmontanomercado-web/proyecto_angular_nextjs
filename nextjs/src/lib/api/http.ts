@@ -17,6 +17,39 @@ export function getAllowedOrigins(): string[] {
   return Array.from(new Set(origins));
 }
 
+/**
+ * URL base del propio backend (esquema + host) tal como la ve el navegador.
+ *
+ * Se prioriza SIEMPRE la cabecera de host de la petición: en Vercel `host` y
+ * `x-forwarded-host` son idénticas y contienen el dominio por el que entró el
+ * usuario (el alias de producción estable), nunca la URL interna del
+ * deployment. `SITE_URL` sólo se usa como último recurso si no hay cabecera.
+ *
+ * Motivo: usar `SITE_URL` como primera opción es frágil. Si esa variable apunta
+ * a un deployment temporal (`backend-<hash>-<team>.vercel.app`), Vercel lo
+ * elimina por su política de retención y la redirección OAuth termina en un
+ * `410 GONE` ("This deployment was removed according to its retention policy").
+ */
+export function getBaseUrl(request: Request): string {
+  const hostHeader =
+    request.headers.get('x-forwarded-host') ||
+    request.headers.get('host');
+
+  if (hostHeader) {
+    // Las cabeceras x-forwarded-* pueden llegar como lista separada por comas:
+    // se toma el primer valor (el más cercano al cliente).
+    const host = hostHeader.split(',')[0].trim();
+    const proto =
+      (request.headers.get('x-forwarded-proto')?.split(',')[0].trim()) || 'http';
+    return `${proto}://${host}`;
+  }
+
+  const envSiteUrl = process.env.SITE_URL;
+  if (envSiteUrl) return envSiteUrl.replace(/\/+$/, '');
+
+  return 'http://localhost:3000';
+}
+
 export type Cors = {
   headers: (request: Request) => Record<string, string>;
   json: (request: Request, body: unknown, status: number) => NextResponse;

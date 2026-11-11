@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { getAllowedOrigins } from '@/lib/api/http';
+import { getAllowedOrigins, getBaseUrl } from '@/lib/api/http';
 
 // Origen del frontend que lanzó el login. Se acepta `?origin=` explícito o, en
 // su defecto, la cabecera `Referer`/`Origin` de la navegación. SIEMPRE se valida
@@ -26,27 +26,6 @@ function getValidFrontendOrigin(request: Request): string | null {
   }
 
   return null;
-}
-
-function getBaseUrl(request: Request): string {
-  const envSiteUrl = process.env.SITE_URL;
-
-  if (envSiteUrl) {
-    return envSiteUrl.replace(/\/+$/, '');
-  }
-
-  const host =
-    request.headers.get('x-forwarded-host') ||
-    request.headers.get('host');
-
-  const proto =
-    request.headers.get('x-forwarded-proto') || 'http';
-
-  if (host) {
-    return `${proto}://${host}`;
-  }
-
-  return 'http://localhost:3000';
 }
 
 export async function GET(request: Request) {
@@ -113,8 +92,7 @@ export async function GET(request: Request) {
   } catch (err) {
     console.error('[Google OAuth] Error inesperado:', err);
 
-    const baseUrl =
-      process.env.SITE_URL || 'http://localhost:3000';
+    const baseUrl = getBaseUrl(request);
 
     const errorUrl = new URL(
       '/google-auth/login',

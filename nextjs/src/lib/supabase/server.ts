@@ -3,19 +3,23 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 export function getSupabaseEnv() {
+  // Variables privadas (sin NEXT_PUBLIC_): estos valores sólo se consumen en el
+  // servidor. Se mantienen los nombres antiguos con prefijo como fallback
+  // temporal para no romper producción durante la migración en Vercel.
   const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
     '';
   const supabaseAnonKey =
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.SUPABASE_ANON_KEY ||
     '';
 
   const missing: string[] = [];
-  if (!supabaseUrl) missing.push('NEXT_PUBLIC_SUPABASE_URL');
-  if (!supabaseAnonKey) missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
+  if (!supabaseUrl) missing.push('SUPABASE_URL');
+  if (!supabaseAnonKey) missing.push('SUPABASE_ANON_KEY / SUPABASE_PUBLISHABLE_KEY');
 
   if (missing.length > 0) {
     throw new Error(

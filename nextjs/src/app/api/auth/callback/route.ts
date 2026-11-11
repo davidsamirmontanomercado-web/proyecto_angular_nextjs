@@ -1,27 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase, authCookieOptions } from '@/lib/supabase/server';
-import { getAllowedOrigins } from '@/lib/api/http';
-
-function getBaseUrl(request: Request): string {
-  const envSiteUrl = process.env.SITE_URL;
-
-  if (envSiteUrl) {
-    return envSiteUrl.replace(/\/+$/, '');
-  }
-
-  const host =
-    request.headers.get('x-forwarded-host') ||
-    request.headers.get('host');
-
-  const proto =
-    request.headers.get('x-forwarded-proto') || 'http';
-
-  if (host) {
-    return `${proto}://${host}`;
-  }
-
-  return 'http://localhost:3000';
-}
+import { getAllowedOrigins, getBaseUrl } from '@/lib/api/http';
 
 function readCookie(request: Request, name: string): string | null {
   const header = request.headers.get('cookie');
@@ -37,7 +16,8 @@ function readCookie(request: Request, name: string): string | null {
 
 // Base del frontend a la que volver. Usa la cookie `oauth_origin` fijada por
 // /api/auth/google, validándola SIEMPRE contra la allowlist (anti open-redirect).
-// Si no existe o no es válida, cae al primer origen permitido.
+// Si no existe o no es válida, cae al primer origen permitido que NO sea local
+// (para no devolver a un usuario real a http://localhost:4200 en producción).
 function resolveAngularBase(request: Request): string {
   const allowed = getAllowedOrigins();
   const fromCookie = readCookie(request, 'oauth_origin');
@@ -45,7 +25,10 @@ function resolveAngularBase(request: Request): string {
     const normalized = fromCookie.replace(/\/+$/, '');
     if (allowed.includes(normalized)) return normalized;
   }
-  return allowed[0].replace(/\/+$/, '');
+  const noLocal = allowed.find(
+    (o) => !/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/i.test(o)
+  );
+  return (noLocal ?? allowed[0]).replace(/\/+$/, '');
 }
 
 export async function GET(request: Request) {

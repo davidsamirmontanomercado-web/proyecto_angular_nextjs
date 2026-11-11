@@ -1,17 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-
-function getBaseUrl(request: Request) {
-  const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
-  const proto = request.headers.get('x-forwarded-proto') || 'http';
-  if (host) return `${proto}://${host}`;
-  const envSiteUrl = process.env.SITE_URL;
-  if (envSiteUrl) return envSiteUrl.replace(/\/$/, '');
-  return 'http://localhost:3000';
-}
+import { getBaseUrl } from '@/lib/api/http';
 
 function buildLoggedOutUrl(baseUrl: string) {
-  const angularBase = (process.env.NEXT_PUBLIC_ANGULAR_URL || 'http://localhost:4200').replace(/\/+$/, '');
+  // Igual que el resto de pantallas de auth: se prefiere la URL configurada y,
+  // si falta, el frontend de producción conocido (nunca localhost en prod).
+  const angularBase = (
+    process.env.NEXT_PUBLIC_ANGULAR_URL ||
+    'https://frontend-three-wine-12.vercel.app'
+  ).replace(/\/+$/, '');
   try {
     const url = new URL(`${angularBase}/login`);
     url.searchParams.set('msg', 'logged_out');

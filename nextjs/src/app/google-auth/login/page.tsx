@@ -135,12 +135,17 @@ export default async function GoogleLoginPage({
   const successMsg = msgKey === 'logged_out' ? ERROR_LABELS.logged_out : null;
 
   const angularBase = getAngularUrl();
-  const nextBase =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') ||
-    'http://localhost:3000';
-  const supabaseCallback =
-    process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/+$/, '') +
-    '/auth/v1/callback';
+  const nextBase = (
+    process.env.SITE_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'http://localhost:3000'
+  ).replace(/\/+$/, '');
+  const supabaseBase = (
+    process.env.SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    ''
+  ).replace(/\/+$/, '');
+  const supabaseCallback = `${supabaseBase}/auth/v1/callback`;
   const nextCallback = `${nextBase}/api/auth/callback`;
 
   return (
