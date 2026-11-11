@@ -31,7 +31,7 @@ export async function GET(
           id,
           cantidad,
           precio_unitario,
-          producto:productos(id, nombre, imagen)
+          producto:productos(id, nombre, imagenes)
         )
       `)
       .eq('id', id)
