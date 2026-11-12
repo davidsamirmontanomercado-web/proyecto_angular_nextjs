@@ -20,7 +20,11 @@
   @if (!loading && !error && categorias.length > 0) {
     <div class="grid-auto">
       @for (c of categorias; track c.id) {
-        <a routerLink="/envivos" class="cat-card">
+        <a
+          routerLink="/envivos"
+          class="cat-card"
+          [style.--cat-accent]="c.accent"
+          [attr.aria-label]="'Explorar ' + c.name">
           <div class="cat-icon">
             @if (c.icUrl) {
               <img [src]="c.icUrl" [alt]="c.name" loading="lazy" (error)="onIconoError(c)">

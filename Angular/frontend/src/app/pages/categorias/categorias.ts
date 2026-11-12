@@ -11,30 +11,36 @@ interface CategoriaCard {
   ic: string;
   /** URL del icono cuando `categorias.icono` guarda una imagen. */
   icUrl: string | null;
+  accent: string;
   name: string;
   sub: string;
 }
 
 /** Icono por defecto según el slug/nombre cuando la categoría no trae icono. */
-const ICONOS_POR_CLAVE: { claves: string[]; icono: string }[] = [
-  { claves: ['mueble', 'hogar', 'decoracion'], icono: '🛋️' },
-  { claves: ['moda', 'ropa', 'calzado', 'textil'], icono: '👗' },
-  { claves: ['tecno', 'electron', 'comput', 'celular'], icono: '💻' },
-  { claves: ['aliment', 'comida', 'bebida', 'restaurant'], icono: '🍽️' },
-  { claves: ['belleza', 'cosmet', 'cuidado'], icono: '💄' },
-  { claves: ['deporte', 'fitness', 'gimnasio'], icono: '🏋️' },
-  { claves: ['vehicul', 'auto', 'moto', 'carro'], icono: '🚗' },
-  { claves: ['inmueble', 'vivienda', 'arriendo'], icono: '🏠' },
-  { claves: ['servicio', 'profesional'], icono: '🛠️' },
-  { claves: ['mascota', 'animal'], icono: '🐾' },
-  { claves: ['juguete', 'nino', 'infantil', 'bebe'], icono: '🧸' },
-  { claves: ['herramienta', 'ferreteria', 'industrial'], icono: '🔧' },
-  { claves: ['arte', 'manualidad', 'artesan'], icono: '🎨' },
-  { claves: ['salud', 'medic'], icono: '💊' },
-  { claves: ['agro', 'campo', 'agric'], icono: '🌾' }
+const ICONOS_POR_CLAVE: { claves: string[]; icono: string; accent: string }[] = [
+  { claves: ['maquinaria', 'industrial', 'fabrica'], icono: '⚙️', accent: '#5368d8' },
+  { claves: ['mueble', 'hogar', 'decoracion'], icono: '🪑', accent: '#a66b42' },
+  { claves: ['moda', 'ropa', 'calzado', 'textil'], icono: '👗', accent: '#c44b8a' },
+  { claves: ['tecno', 'electron', 'comput', 'celular'], icono: '💻', accent: '#3976c5' },
+  { claves: ['aliment', 'comida', 'bebida', 'restaurant'], icono: '🍽️', accent: '#d58b35' },
+  { claves: ['belleza', 'cosmet', 'cuidado'], icono: '💄', accent: '#c44b8a' },
+  { claves: ['deporte', 'fitness', 'gimnasio'], icono: '🏋️', accent: '#428b69' },
+  { claves: ['vehicul', 'auto', 'moto', 'carro', 'transporte'], icono: '🚗', accent: '#4c6d91' },
+  { claves: ['inmueble', 'vivienda', 'arriendo'], icono: '🏠', accent: '#4f927e' },
+  { claves: ['servicio', 'profesional'], icono: '🛠️', accent: '#67758a' },
+  { claves: ['mascota', 'animal'], icono: '🐾', accent: '#bb8146' },
+  { claves: ['juguete', 'nino', 'infantil', 'bebe'], icono: '🧸', accent: '#d47658' },
+  { claves: ['herramienta', 'ferreteria'], icono: '🔧', accent: '#c3793f' },
+  { claves: ['construccion', 'material', 'acabado'], icono: '🏗️', accent: '#bd8139' },
+  { claves: ['electric', 'ilumin', 'cable'], icono: '⚡', accent: '#cf9b2e' },
+  { claves: ['empaque', 'embalaje', 'caja'], icono: '�', accent: '#5c8a72' },
+  { claves: ['arte', 'manualidad', 'artesan'], icono: '🎨', accent: '#8a65bf' },
+  { claves: ['salud', 'medic'], icono: '💊', accent: '#438d91' },
+  { claves: ['agro', 'campo', 'agric'], icono: '🌾', accent: '#658f46' }
 ];
 
 const ICONO_FALLBACK = '📋';
+const ACCENT_FALLBACK = '#64748b';
 
 @Component({
   selector: 'app-categorias',
@@ -77,8 +83,13 @@ export class CategoriasComponent implements OnInit {
 
     return {
       id: c.id,
-      ic: esImagen ? '' : raw || this.iconoPorDefecto(c),
+      ic: esImagen
+        ? ''
+        : this.esAbreviatura(raw) || !raw
+          ? this.iconoPorDefecto(c)
+          : raw,
       icUrl: esImagen ? raw : null,
+      accent: this.acentoPorDefecto(c),
       name: (c.nombre ?? '').trim() || 'Sin nombre',
       sub: this.buildSub(c)
     };
@@ -92,9 +103,23 @@ export class CategoriasComponent implements OnInit {
   }
 
   private iconoPorDefecto(c: Categoria): string {
-    const clave = `${c.slug ?? ''} ${c.nombre ?? ''}`.toLowerCase();
-    const encontrado = ICONOS_POR_CLAVE.find((e) => e.claves.some((k) => clave.includes(k)));
-    return encontrado?.icono ?? ICONO_FALLBACK;
+    return this.configuracionIcono(c)?.icono ?? ICONO_FALLBACK;
+  }
+
+  private acentoPorDefecto(c: Categoria): string {
+    return this.configuracionIcono(c)?.accent ?? ACCENT_FALLBACK;
+  }
+
+  private configuracionIcono(c: Categoria) {
+    const clave = `${c.slug ?? ''} ${c.nombre ?? ''}`
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+    return ICONOS_POR_CLAVE.find((e) => e.claves.some((k) => clave.includes(k)));
+  }
+
+  private esAbreviatura(valor: string): boolean {
+    return /^[A-ZÁÉÍÓÚÜÑ]{2,5}$/.test(valor);
   }
 
   /** Si la imagen del icono no carga, cae a un emoji legible. */
