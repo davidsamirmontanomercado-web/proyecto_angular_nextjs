@@ -110,6 +110,21 @@ export interface TokenLiveKit {
   sala: string;
 }
 
+/**
+ * Producto promocionado en una transmisión (viene de la vista pública del
+ * backend; nunca expone datos privados del vendedor).
+ */
+export interface ProductoPromocionado {
+  producto_id: number;
+  orden: number;
+  nombre: string;
+  descripcion: string | null;
+  precio: number;
+  imagen: string | null;
+  categoria: string | null;
+  tag: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TransmisionesService {
   private http = inject(HttpClient);
@@ -192,6 +207,33 @@ export class TransmisionesService {
     return this.http
       .post<TransmisionEstadoResponse>(`${this.apiUrl}/${id}/finalizar`, {})
       .pipe(map((res) => ({ id: res.data.id, estado: res.data.estado })));
+  }
+
+  /** (programada | en_vivo) -> cancelada (sólo el anfitrión). */
+  cancelar(id: string): Observable<{ id: string; estado: string }> {
+    return this.http
+      .post<TransmisionEstadoResponse>(`${this.apiUrl}/${id}/cancelar`, {})
+      .pipe(map((res) => ({ id: res.data.id, estado: res.data.estado })));
+  }
+
+  // --- Productos promocionados en la transmisión ---------------------------
+
+  /** Lista los productos promocionados (público para transmisiones en vivo). */
+  getProductosTransmision(id: string): Observable<ProductoPromocionado[]> {
+    return this.http
+      .get<{ data: ProductoPromocionado[] }>(`${this.apiUrl}/${id}/productos`)
+      .pipe(map((res) => res.data ?? []));
+  }
+
+  /** El anfitrión reemplaza la lista de productos promocionados de su transmisión. */
+  guardarProductosTransmision(
+    id: string,
+    productos: number[]
+  ): Observable<{ id: string; productos: number[] }> {
+    return this.http.put<{ data: { id: string; productos: number[] } }>(
+      `${this.apiUrl}/${id}/productos`,
+      { productos }
+    ).pipe(map((res) => res.data));
   }
 
   /**

@@ -3,6 +3,7 @@ import {
   ElementRef,
   OnDestroy,
   OnInit,
+  computed,
   effect,
   inject,
   signal,
@@ -18,11 +19,13 @@ import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import {
   AnfitrionPublico,
+  ProductoPromocionado,
   RolLiveKit,
   TokenLiveKit,
   Transmision,
   TransmisionesService
 } from '../../services/transmisiones.service';
+import { Producto, ProductosService } from '../../services/productos.service';
 import { MensajeChat, MensajesChatService } from '../../services/mensajes-chat.service';
 import { ReaccionesService, ResumenReacciones } from '../../services/reacciones.service';
 import { SeguimientosService } from '../../services/seguimientos.service';
@@ -37,7 +40,7 @@ interface Recomendado {
 interface ErrorHttp {
   status?: number;
   name?: string;
-  error?: { error?: string };
+  error?: { error?: string; variablesFaltantes?: string[] };
 }
 
 /** Estado de la conexión con la sala de LiveKit. */
@@ -52,6 +55,7 @@ type EstadoLiveKit = 'inactivo' | 'conectando' | 'conectado' | 'reconectando' | 
 export class LiveComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private transmisiones = inject(TransmisionesService);
+  private productosService = inject(ProductosService);
   private chat = inject(MensajesChatService);
   private reacciones = inject(ReaccionesService);
   private seguimientos = inject(SeguimientosService);
@@ -62,6 +66,12 @@ export class LiveComponent implements OnInit, OnDestroy {
   private readonly videoLocalRef = viewChild<ElementRef<HTMLVideoElement>>('videoLocal');
   /** Vídeo remoto: lo que el espectador recibe del anfitrión. */
   private readonly videoRemotoRef = viewChild<ElementRef<HTMLVideoElement>>('videoRemoto');
+  /** Pantalla compartida por el anfitrión (vista previa local de su captura). */
+  private readonly videoPantallaLocalRef =
+    viewChild<ElementRef<HTMLVideoElement>>('videoPantallaLocal');
+  /** Pantalla compartida del anfitrión vista por el espectador. */
+  private readonly videoPantallaRemotaRef =
+    viewChild<ElementRef<HTMLVideoElement>>('videoPantallaRemota');
 
   /**
    * ¿Hay una sesión utilizable para las consultas "por usuario" (me gusta,
@@ -110,6 +120,24 @@ export class LiveComponent implements OnInit, OnDestroy {
   camaraActiva = signal(false);
   camaraError = signal<string | null>(null);
 
+  // Productos promocionados en la transmisión
+  /** Productos ya asociados a la transmisión (visibles para el espectador). */
+  productosPromocionados = signal<ProductoPromocionado[]>([]);
+  /** Catálogo propio del anfitrión (sólo se carga para el propietario). */
+  catalogoPropio = signal<Producto[]>([]);
+  /** Ids seleccionados por el anfitrión en el selector. */
+  seleccionProductos = signal<number[]>([]);
+  catalogoCargando = signal(false);
+  productosGuardando = signal(false);
+  /** El anfitrión abre/cierra el selector de productos. */
+  selectorProductosVisible = false;
+
+  // Dispositivos de entrada disponibles (cámara / micrófono)
+  dispositivosVideo = signal<MediaDeviceInfo[]>([]);
+  dispositivosAudio = signal<MediaDeviceInfo[]>([]);
+  dispositivoVideoId = signal<string>('');
+  dispositivoAudioId = signal<string>('');
+
   // Emisión en tiempo real (LiveKit)
   /** Rol concedido por el backend para la sala ('anfitrion' | 'espectador'). */
   rolLiveKit = signal<RolLiveKit | null>(null);
@@ -156,6 +184,15 @@ export class LiveComponent implements OnInit, OnDestroy {
   private readonly pistasRemotas = signal<RemoteTrack[]>([]);
   /** Pista de cámara local del anfitrión que se está publicando. */
   private readonly pistaVideoLocal = signal<Track | null>(null);
+  /** Pista de pantalla local del anfitrión que se está publicando (compartir pantalla). */
+  private readonly pistaPantallaLocal = signal<Track | null>(null);
+  /** Pista de pantalla compartida del anfitrión recibida por el espectador. */
+  private readonly pistaPantallaRemota = signal<RemoteTrack | null>(null);
+
+  /** El anfitrión está compartiendo su pantalla en este momento. */
+  readonly pantallaCompartida = computed(() => this.pistaPantallaLocal() !== null);
+  /** El espectador está recibiendo la pantalla compartida del anfitrión. */
+  readonly pantallaRemotaActiva = computed(() => this.pistaPantallaRemota() !== null);
 
   constructor() {
     // Los <video> viven dentro de @if, así que se recrean al cambiar de estado:
@@ -177,6 +214,22 @@ export class LiveComponent implements OnInit, OnDestroy {
       }
       // `attach` mezcla audio y video en el mismo MediaStream del elemento.
       pistas.forEach((p) => p.attach(el));
+    });
+    // Pantalla compartida local del anfitrión (su propia captura).
+    effect(() => {
+      const el = this.videoPantallaLocalRef()?.nativeElement;
+      const pista = this.pistaPantallaLocal();
+      if (!el) return;
+      if (pista) pista.attach(el);
+      else el.srcObject = null;
+    });
+    // Pantalla compartida del anfitrión recibida por el espectador.
+    effect(() => {
+      const el = this.videoPantallaRemotaRef()?.nativeElement;
+      const pista = this.pistaPantallaRemota();
+      if (!el) return;
+      if (pista) pista.attach(el);
+      else el.srcObject = null;
     });
   }
 
@@ -220,6 +273,10 @@ export class LiveComponent implements OnInit, OnDestroy {
     this.avisoSesion.set(null);
     this.presenciaFallos = 0;
     this.estadoConsultando = false;
+    this.productosPromocionados.set([]);
+    this.seleccionProductos.set([]);
+    this.catalogoPropio.set([]);
+    this.selectorProductosVisible = false;
     // Al cambiar de transmisión no debe quedar ninguna captura ni latido previos.
     this.detenerCamara();
     void this.desconectarLiveKit();
@@ -240,6 +297,7 @@ export class LiveComponent implements OnInit, OnDestroy {
         this.loading.set(false);
         this.cargarAnfitrion(id);
         this.cargarRecomendados(id);
+        this.cargarProductos(id);
 
         // El propietario puede abrir una transmisión ya finalizada desde su
         // panel: se muestra el cierre sin montar cámara, presencia ni sondeo.
@@ -413,7 +471,14 @@ export class LiveComponent implements OnInit, OnDestroy {
         this.siguiendo.set(siguiendo);
         this.esPropietario.set(esPropietario);
         // Sólo se registra presencia quien NO es el anfitrión de la emisión.
-        if (!esPropietario) this.iniciarPresencia(id);
+        if (!esPropietario) {
+          this.iniciarPresencia(id);
+        } else {
+          // El anfitrión necesita su catálogo (productos a promocionar) y la
+          // lista de dispositivos disponibles para sus controles de emisión.
+          this.cargarCatalogoPropio();
+          void this.cargarDispositivos();
+        }
       },
       error: (err: ErrorHttp) => {
         // Estado neutro: sin este dato no se conoce el seguimiento ni la propiedad.
@@ -455,6 +520,165 @@ export class LiveComponent implements OnInit, OnDestroy {
         this.toast.err(this.mensajeError(err, 'No se pudo actualizar el seguimiento.'));
       }
     });
+  }
+
+  // ---- Productos promocionados (Live Commerce) ----------------------------
+
+  /** Carga los productos promocionados de la transmisión (público si está en vivo). */
+  private cargarProductos(id: string): void {
+    this.transmisiones.getProductosTransmision(id).subscribe({
+      next: (lista) => {
+        if (this.transmisionId !== id) return;
+        this.productosPromocionados.set(lista);
+        // La selección del anfitrión parte de lo ya guardado.
+        this.seleccionProductos.set(lista.map((p) => p.producto_id));
+      },
+      error: (err: ErrorHttp) => {
+        // 503 = la migración de esta tabla aún no está aplicada: no rompe el live.
+        if (err?.status !== 503) {
+          console.warn('No se pudieron cargar los productos promocionados:', err?.status);
+        }
+        this.productosPromocionados.set([]);
+      }
+    });
+  }
+
+  /** Catálogo propio del anfitrión (sólo sus productos) para elegir qué promocionar. */
+  private cargarCatalogoPropio(): void {
+    const usuarioId = this.auth.currentUser()?.id;
+    if (!usuarioId || this.catalogoCargando()) return;
+
+    this.catalogoCargando.set(true);
+    this.productosService.getProductos({ vendedorId: usuarioId }).subscribe({
+      next: (res) => {
+        this.catalogoPropio.set(res.data ?? []);
+        this.catalogoCargando.set(false);
+      },
+      error: (err: ErrorHttp) => {
+        console.warn('No se pudo cargar el catálogo propio:', err?.status);
+        this.catalogoPropio.set([]);
+        this.catalogoCargando.set(false);
+      }
+    });
+  }
+
+  toggleSelectorProductos(): void {
+    this.selectorProductosVisible = !this.selectorProductosVisible;
+    if (this.selectorProductosVisible && this.catalogoPropio().length === 0) {
+      this.cargarCatalogoPropio();
+    }
+  }
+
+  estaSeleccionado(productoId: number): boolean {
+    return this.seleccionProductos().includes(productoId);
+  }
+
+  alternarProductoSeleccionado(productoId: number): void {
+    this.seleccionProductos.update((ids) =>
+      ids.includes(productoId) ? ids.filter((x) => x !== productoId) : [...ids, productoId]
+    );
+  }
+
+  /** Guarda la selección de productos promocionados (sólo el anfitrión). */
+  guardarProductos(): void {
+    if (this.productosGuardando() || !this.esAnfitrion) return;
+
+    this.productosGuardando.set(true);
+    this.transmisiones
+      .guardarProductosTransmision(this.transmisionId, this.seleccionProductos())
+      .subscribe({
+        next: () => {
+          this.productosGuardando.set(false);
+          this.selectorProductosVisible = false;
+          this.toast.ok('Productos promocionados actualizados');
+          this.cargarProductos(this.transmisionId);
+        },
+        error: (err: ErrorHttp) => {
+          this.productosGuardando.set(false);
+          this.toast.err(this.mensajeError(err, 'No se pudieron guardar los productos.'));
+        }
+      });
+  }
+
+  /** Producto que se destaca en la escena para el espectador. */
+  get productoDestacado(): ProductoPromocionado | null {
+    return this.productosPromocionados()[0] ?? null;
+  }
+
+  // ---- Dispositivos de entrada (cámara / micrófono) -----------------------
+
+  /**
+   * Enumera los dispositivos disponibles. Las etiquetas sólo aparecen tras
+   * conceder permiso de cámara/micrófono, así que puede llamarse sin problemas
+   * antes: devolverá la lista (posiblemente sin nombres) si el navegador lo permite.
+   */
+  async cargarDispositivos(): Promise<void> {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const video = devices.filter((d) => d.kind === 'videoinput');
+      const audio = devices.filter((d) => d.kind === 'audioinput');
+      this.dispositivosVideo.set(video);
+      this.dispositivosAudio.set(audio);
+
+      const videoId = this.dispositivoVideoId();
+      if (!videoId || !video.some((d) => d.deviceId === videoId)) {
+        this.dispositivoVideoId.set(video[0]?.deviceId ?? '');
+      }
+      const audioId = this.dispositivoAudioId();
+      if (!audioId || !audio.some((d) => d.deviceId === audioId)) {
+        this.dispositivoAudioId.set(audio[0]?.deviceId ?? '');
+      }
+    } catch (err) {
+      console.warn('No se pudieron enumerar los dispositivos:', err);
+    }
+  }
+
+  /** Cambia la cámara activa (pista publicada en LiveKit o vista previa local). */
+  async cambiarDispositivoVideo(deviceId: string): Promise<void> {
+    this.dispositivoVideoId.set(deviceId);
+    if (!deviceId) return;
+    try {
+      if (this.room) {
+        await this.room.switchActiveDevice('videoinput', deviceId);
+      } else if (this.mediaStream) {
+        await this.reabrirVistaPrevia({ video: deviceId });
+      }
+    } catch (err) {
+      console.warn('No se pudo cambiar la cámara:', err);
+      this.camaraError.set('No se pudo cambiar de cámara.');
+    }
+  }
+
+  /** Cambia el micrófono activo (pista publicada en LiveKit o vista previa local). */
+  async cambiarDispositivoAudio(deviceId: string): Promise<void> {
+    this.dispositivoAudioId.set(deviceId);
+    if (!deviceId) return;
+    try {
+      if (this.room) {
+        await this.room.switchActiveDevice('audioinput', deviceId);
+      } else if (this.mediaStream) {
+        await this.reabrirVistaPrevia({ audio: deviceId });
+      }
+    } catch (err) {
+      console.warn('No se pudo cambiar el micrófono:', err);
+      this.camaraError.set('No se pudo cambiar de micrófono.');
+    }
+  }
+
+  /** Reabre getUserMedia con el dispositivo indicado (vista previa local). */
+  private async reabrirVistaPrevia(dispositivo: { video?: string; audio?: string }): Promise<void> {
+    if (!navigator.mediaDevices?.getUserMedia) return;
+    const video: boolean | MediaTrackConstraints = dispositivo.video
+      ? { deviceId: { exact: dispositivo.video } }
+      : true;
+    const audio: boolean | MediaTrackConstraints = dispositivo.audio
+      ? { deviceId: { exact: dispositivo.audio } }
+      : true;
+    const stream = await navigator.mediaDevices.getUserMedia({ video, audio });
+    this.mediaStream?.getTracks().forEach((t) => t.stop());
+    this.mediaStream = stream;
+    this.asignarVideo(stream);
   }
 
   // ---- Sesión no utilizable ----------------------------------------------
@@ -581,12 +805,30 @@ export class LiveComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Cancela la transmisión (programada o en vivo). Sólo el anfitrión. */
+  cancelarTransmision(): void {
+    if (this.accionando() || !this.esAnfitrion) return;
+    this.accionando.set(true);
+    this.transmisiones.cancelar(this.transmisionId).subscribe({
+      next: () => {
+        this.accionando.set(false);
+        this.toast.ok('Transmisión cancelada');
+        // El backend ya persistió 'cancelada' y cerró la sala de LiveKit.
+        this.marcarFinalizada('cancelada');
+      },
+      error: (err: ErrorHttp) => {
+        this.accionando.set(false);
+        this.toast.err(this.mensajeError(err, 'No se pudo cancelar la transmisión.'));
+      }
+    });
+  }
+
   /**
-   * Cierre local del live (lo detecta el anfitrión al finalizar o el espectador
-   * al comprobar que la transmisión ya no está en vivo). Detiene captura,
-   * heartbeat y sondeo, y libera los recursos multimedia.
+   * Cierre local del live (lo detecta el anfitrión al finalizar/cancelar o el
+   * espectador al comprobar que la transmisión ya no está en vivo). Detiene
+   * captura, heartbeat y sondeo, y libera los recursos multimedia.
    */
-  private marcarFinalizada(): void {
+  private marcarFinalizada(estado: 'finalizada' | 'cancelada' = 'finalizada'): void {
     if (this.finalizada()) return;
     this.finalizada.set(true);
     this.detenerPoll();
@@ -595,7 +837,7 @@ export class LiveComponent implements OnInit, OnDestroy {
     // Se deja de publicar y se desconecta la sala: el backend ya no emite
     // tokens para esta transmisión y no hay reconexión posible.
     void this.desconectarLiveKit();
-    this.transmision.update((t) => (t ? { ...t, estado: 'finalizada' } : t));
+    this.transmision.update((t) => (t ? { ...t, estado } : t));
   }
 
   private recargarTransmision(): void {
@@ -645,6 +887,8 @@ export class LiveComponent implements OnInit, OnDestroy {
       this.mediaStream = stream;
       this.camaraActiva.set(true);
       this.asignarVideo(stream);
+      // Ya hay permiso: los dispositivos ahora traen etiqueta.
+      void this.cargarDispositivos();
     } catch (err) {
       this.camaraError.set(this.mensajeCamara(err));
     } finally {
@@ -785,12 +1029,27 @@ export class LiveComponent implements OnInit, OnDestroy {
    */
   private registrarEventosSala(room: Room): () => void {
     const alSuscribir = (track: RemoteTrack): void => {
+      // La pantalla compartida viaja en su propia pista (source = ScreenShare) y
+      // se muestra en un <video> aparte que SUSTITUYE a la cámara del anfitrión.
+      // El audio del sistema (ScreenShareAudio) y el micrófono siguen yendo al
+      // elemento de vídeo remoto normal.
+      if (track.source === Track.Source.ScreenShare) {
+        // Nunca debe quedar más de una pista de pantalla enganchada.
+        const anterior = this.pistaPantallaRemota();
+        if (anterior && anterior !== track) anterior.detach();
+        this.pistaPantallaRemota.set(track);
+        return;
+      }
       this.pistasRemotas.update((ps) => (ps.includes(track) ? ps : [...ps, track]));
       if (track.kind === Track.Kind.Video) this.videoRemotoActivo.set(true);
     };
 
     const alDesuscribir = (track: RemoteTrack): void => {
       track.detach();
+      if (track.source === Track.Source.ScreenShare) {
+        this.pistaPantallaRemota.update((p) => (p === track ? null : p));
+        return;
+      }
       this.pistasRemotas.update((ps) => ps.filter((p) => p !== track));
       if (track.kind === Track.Kind.Video) {
         this.videoRemotoActivo.set(this.pistasRemotas().some((p) => p.kind === Track.Kind.Video));
@@ -861,6 +1120,9 @@ export class LiveComponent implements OnInit, OnDestroy {
       this.camaraError.set(this.mensajeCamara(err));
     } finally {
       if (this.room === room) this.actualizarEstadoLocal(room);
+      // Con el permiso ya concedido, las etiquetas de los dispositivos pasan a
+      // estar disponibles: se refresca la lista para el selector.
+      void this.cargarDispositivos();
     }
   }
 
@@ -925,6 +1187,88 @@ export class LiveComponent implements OnInit, OnDestroy {
     this.camaraActiva.set(room.localParticipant.isCameraEnabled);
     this.micActivo.set(room.localParticipant.isMicrophoneEnabled);
     if (!this.camaraActiva()) this.pistaVideoLocal.set(null);
+
+    // Pantalla compartida: si el navegador detiene la captura (botón "Detener
+    // compartir" del propio navegador) la publicación desaparece y aquí se
+    // refleja; la cámara sigue publicada y se vuelve a mostrar sola.
+    const pubPantalla = room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
+    const pistaPantalla = pubPantalla?.track ?? null;
+    if (this.pistaPantallaLocal() !== pistaPantalla) this.pistaPantallaLocal.set(pistaPantalla);
+  }
+
+  // ---- Compartir pantalla (anfitrión) --------------------------------------
+
+  /** ¿El navegador permite capturar la pantalla? */
+  puedeCompartirPantalla(): boolean {
+    return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getDisplayMedia;
+  }
+
+  /**
+   * Activa o detiene el uso compartido de pantalla del anfitrión.
+   * LiveKit publica una pista con `source = ScreenShare`; el backend ya concedió
+   * al anfitrión `canPublish`, así que no se toca el token ni la sala. Al dejar
+   * de compartir, la cámara (que nunca se dejó de publicar) vuelve a mostrarse.
+   */
+  async togglePantalla(): Promise<void> {
+    const room = this.room;
+    if (!room) return;
+    if (room.localParticipant.isScreenShareEnabled) {
+      await this.detenerPantalla(room);
+      return;
+    }
+    if (!this.puedeCompartirPantalla()) {
+      this.camaraError.set(
+        'Este navegador no permite compartir pantalla. Usa una versión reciente de Chrome, Edge o Firefox.'
+      );
+      return;
+    }
+    if (this.camaraIniciando) return;
+
+    this.camaraIniciando = true;
+    this.camaraError.set(null);
+    try {
+      const pub = await room.localParticipant.setScreenShareEnabled(true);
+      if (this.room === room) this.pistaPantallaLocal.set(pub?.track ?? null);
+    } catch (err) {
+      this.camaraError.set(this.mensajePantalla(err));
+    } finally {
+      this.actualizarEstadoLocal(room);
+      this.camaraIniciando = false;
+    }
+  }
+
+  /** Detiene la pantalla compartida y recupera la visualización de la cámara. */
+  private async detenerPantalla(room: Room): Promise<void> {
+    if (this.camaraIniciando) return;
+    this.camaraIniciando = true;
+    this.camaraError.set(null);
+    try {
+      await room.localParticipant.setScreenShareEnabled(false);
+      if (this.room === room) this.pistaPantallaLocal.set(null);
+    } catch (err) {
+      this.camaraError.set(this.mensajePantalla(err));
+    } finally {
+      this.actualizarEstadoLocal(room);
+      this.camaraIniciando = false;
+    }
+  }
+
+  /** Mensaje entendible según el motivo real del fallo al compartir pantalla. */
+  private mensajePantalla(err: unknown): string {
+    switch ((err as { name?: string })?.name) {
+      case 'NotAllowedError':
+      case 'SecurityError':
+        return 'Permiso para compartir pantalla denegado. Habilítalo en el navegador para mostrarla en el live.';
+      case 'NotFoundError':
+      case 'NotReadableError':
+        return 'No se pudo leer la pantalla seleccionada. Inténtalo de nuevo.';
+      case 'AbortError':
+        return 'Se canceló la selección de pantalla.';
+      case 'NotSupportedError':
+        return 'Este navegador no permite compartir pantalla.';
+      default:
+        return 'No se pudo compartir la pantalla.';
+    }
   }
 
   private mensajeLiveKit(err: unknown): string {
@@ -938,8 +1282,13 @@ export class LiveComponent implements OnInit, OnDestroy {
         return 'La transmisión ya no está disponible.';
       case 409:
         return 'La transmisión no está en vivo: la emisión en tiempo real se cerró.';
-      case 503:
-        return e?.error?.error || 'La emisión en tiempo real no está disponible en el servidor.';
+      case 503: {
+        // El backend informa (sólo los nombres) de qué variables faltan.
+        const base =
+          e?.error?.error || 'La emisión en tiempo real no está disponible en el servidor.';
+        const faltan = e?.error?.variablesFaltantes;
+        return faltan && faltan.length > 0 ? `${base} (Faltan: ${faltan.join(', ')}.)` : base;
+      }
       default:
         return e?.error?.error || 'No se pudo conectar con la emisión en tiempo real.';
     }
@@ -956,6 +1305,8 @@ export class LiveComponent implements OnInit, OnDestroy {
     this.limpiarEventosSala = null;
     this.pistasRemotas.set([]);
     this.pistaVideoLocal.set(null);
+    this.pistaPantallaLocal.set(null);
+    this.pistaPantallaRemota.set(null);
     this.videoRemotoActivo.set(false);
     this.audioBloqueado.set(false);
     this.micActivo.set(false);

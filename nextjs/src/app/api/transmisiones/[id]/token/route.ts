@@ -1,5 +1,10 @@
 import { cors, mapErrorBD, requireUser, UUID_RE } from '@/lib/api/http';
-import { crearTokenSala, leerConfigLiveKit, type RolLiveKit } from '@/lib/livekit/server';
+import {
+  crearTokenSala,
+  leerConfigLiveKit,
+  variablesLiveKitFaltantes,
+  type RolLiveKit
+} from '@/lib/livekit/server';
 import type { User } from '@supabase/supabase-js';
 
 // POST /api/transmisiones/[id]/token
@@ -43,12 +48,19 @@ export async function POST(
 
   const config = leerConfigLiveKit();
   if (!config) {
-    // Falta configuración en el servidor: no se inventan credenciales.
+    // Falta configuración en el servidor: no se inventan credenciales. Se
+    // informa EXACTAMENTE qué variables faltan (sólo sus nombres, nunca sus
+    // valores) para que el despliegue se pueda corregir sin adivinar.
+    const faltantes = variablesLiveKitFaltantes();
+    console.error(
+      `[LiveKit] No se puede emitir el token: faltan variables de entorno en el servidor: ${faltantes.join(', ')}.`
+    );
     return CORS.json(
       request,
       {
         error:
-          'La emisión en tiempo real no está disponible: al servidor le faltan las credenciales de LiveKit.'
+          'La emisión en tiempo real no está disponible: al servidor le faltan las credenciales de LiveKit.',
+        variablesFaltantes: faltantes
       },
       503
     );

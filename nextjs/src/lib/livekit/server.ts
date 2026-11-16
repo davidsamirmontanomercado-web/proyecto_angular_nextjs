@@ -17,6 +17,19 @@ export interface ConfigLiveKit {
 }
 
 /**
+ * Nombres de las variables de entorno de LiveKit que faltan en el servidor.
+ * Nunca devuelve valores: sólo los NOMBRES, para poder responder un error que
+ * diga exactamente qué hay que configurar sin filtrar secretos.
+ */
+export function variablesLiveKitFaltantes(): string[] {
+  const faltantes: string[] = [];
+  if (!process.env.LIVEKIT_URL?.trim()) faltantes.push('LIVEKIT_URL');
+  if (!process.env.LIVEKIT_API_KEY?.trim()) faltantes.push('LIVEKIT_API_KEY');
+  if (!process.env.LIVEKIT_API_SECRET?.trim()) faltantes.push('LIVEKIT_API_SECRET');
+  return faltantes;
+}
+
+/**
  * Lee la configuración de LiveKit del entorno del servidor.
  * Devuelve `null` si falta cualquiera de las tres variables, de modo que las
  * rutas puedan responder un error claro en lugar de fallar de forma opaca.
@@ -70,11 +83,31 @@ export async function crearTokenSala(params: {
 /**
  * Elimina la sala para expulsar a todos los participantes.
  * Sólo debe llamarse cuando la transmisión ya quedó confirmada como
- * `finalizada` en la base de datos.
+ * `finalizada` (o `cancelada`) en la base de datos.
  */
 export async function eliminarSala(config: ConfigLiveKit, sala: string): Promise<void> {
   // RoomServiceClient usa HTTP(S); LIVEKIT_URL suele venir como wss://.
   const host = config.url.replace(/^ws/, 'http');
   const servicio = new RoomServiceClient(host, config.apiKey, config.apiSecret);
   await servicio.deleteRoom(sala);
+}
+
+/**
+ * Número de participantes conectados a una sala.
+ * Devuelve `null` si la sala no existe (LiveKit responde error al listar), de
+ * modo que quien llama pueda distinguir "sala cerrada" de "sala vacía".
+ */
+export async function contarParticipantes(
+  config: ConfigLiveKit,
+  sala: string
+): Promise<number | null> {
+  const host = config.url.replace(/^ws/, 'http');
+  const servicio = new RoomServiceClient(host, config.apiKey, config.apiSecret);
+  try {
+    const participantes = await servicio.listParticipants(sala);
+    return participantes.length;
+  } catch {
+    // La sala ya no existe (o LiveKit no responde): se trata como "sin sala".
+    return null;
+  }
 }

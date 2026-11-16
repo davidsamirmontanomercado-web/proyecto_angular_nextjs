@@ -29,7 +29,7 @@
     <div class="container">
       <div class="state-card">
         <div class="state-emoji">🏁</div>
-        <h3>Esta transmisión ya finalizó</h3>
+        <h3>{{ transmision()?.estado === 'cancelada' ? 'Esta transmisión fue cancelada' : 'Esta transmisión ya finalizó' }}</h3>
         <p>
           El live se cerró y la emisión se detuvo. Esta transmisión ya no admite nuevos
           espectadores.
@@ -41,7 +41,7 @@
     <div class="player">
       <div
         class="player-stage"
-        [style.background]="transmision()?.imagen_portada && !camaraActiva() && !videoRemotoActivo()
+        [style.background]="transmision()?.imagen_portada && !camaraActiva() && !videoRemotoActivo() && !pantallaCompartida() && !pantallaRemotaActiva()
           ? 'url(' + transmision()!.imagen_portada + ') center/cover no-repeat'
           : null"
       >
@@ -49,7 +49,17 @@
         <video
           #videoLocal
           class="stage-video host-video"
-          [class.oculto]="!camaraActiva()"
+          [class.oculto]="!camaraActiva() || pantallaCompartida()"
+          autoplay
+          playsinline
+          muted
+        ></video>
+
+        <!-- Pantalla compartida por el ANFITRIÓN (su propia captura). -->
+        <video
+          #videoPantallaLocal
+          class="stage-video host-video screen-video"
+          [class.oculto]="!pantallaCompartida()"
           autoplay
           playsinline
           muted
@@ -59,12 +69,21 @@
         <video
           #videoRemoto
           class="stage-video remote-video"
-          [class.oculto]="!videoRemotoActivo() || camaraActiva()"
+          [class.oculto]="!videoRemotoActivo() || camaraActiva() || pantallaRemotaActiva()"
           autoplay
           playsinline
         ></video>
 
-        @if (!transmision()?.imagen_portada && !camaraActiva() && !videoRemotoActivo()) {
+        <!-- Pantalla compartida del anfitrión vista por el ESPECTADOR. -->
+        <video
+          #videoPantallaRemota
+          class="stage-video remote-video screen-video"
+          [class.oculto]="!pantallaRemotaActiva()"
+          autoplay
+          playsinline
+        ></video>
+
+        @if (!transmision()?.imagen_portada && !camaraActiva() && !videoRemotoActivo() && !pantallaCompartida() && !pantallaRemotaActiva()) {
           <div class="ph">👥 {{ espectadoresActuales() }} viendo ahora</div>
         }
 
@@ -91,6 +110,20 @@
           <div class="live-badge">🔴 EN VIVO</div>
         } @else {
           <div class="live-badge live-badge-off">🗓️ PROGRAMADA</div>
+        }
+
+        <!-- Producto promocionado (lo ve el espectador durante el live). -->
+        @if (!esAnfitrion && productoDestacado; as prod) {
+          <div class="promo-card">
+            @if (prod.imagen) {
+              <img class="promo-img" [src]="prod.imagen" [alt]="prod.nombre">
+            }
+            <div class="promo-body">
+              <div class="promo-tag">🛍️ En promoción</div>
+              <div class="promo-name">{{ prod.nombre }}</div>
+              <div class="promo-price">${{ prod.precio }}</div>
+            </div>
+          </div>
         }
         <button class="chat-fab" (click)="toggleChat()" [class.open]="chatVisible">
           {{ chatVisible ? '✕' : '💬' }}
@@ -237,6 +270,25 @@
         <p class="player-desc">{{ transmision()!.descripcion }}</p>
       }
 
+      @if (productosPromocionados().length > 0) {
+        <div class="promo-strip">
+          <div class="promo-strip-tag">🛍️ Productos promocionados</div>
+          <div class="promo-strip-list">
+            @for (p of productosPromocionados(); track p.producto_id) {
+              <div class="promo-strip-item">
+                @if (p.imagen) {
+                  <img [src]="p.imagen" [alt]="p.nombre">
+                }
+                <div class="promo-strip-body">
+                  <div class="promo-strip-name">{{ p.nombre }}</div>
+                  <div class="promo-strip-price">${{ p.precio }}</div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
       @if (autoresTexto) {
         <p class="reacciones-autores">👍 Reaccionaron: {{ autoresTexto }}</p>
       }
@@ -279,15 +331,88 @@
               <button class="paction" [disabled]="accionando()" (click)="toggleMicrofono()">
                 {{ micActivo() ? '🔇 Silenciar micrófono' : '🎙️ Activar micrófono' }}
               </button>
+              @if (puedeCompartirPantalla()) {
+                <button class="paction" [disabled]="accionando()" (click)="togglePantalla()">
+                  {{ pantallaCompartida() ? '⏹️ Dejar de compartir' : '🖥️ Compartir pantalla' }}
+                </button>
+              }
             }
             @if (!enVivo) {
               <button class="paction" [disabled]="accionando()" (click)="iniciarTransmision()">
                 {{ accionando() ? 'Iniciando…' : '🔴 Iniciar transmisión' }}
               </button>
+              <button class="paction paction-danger" [disabled]="accionando()" (click)="cancelarTransmision()">
+                🚫 Cancelar transmisión
+              </button>
             } @else {
               <button class="paction" [disabled]="accionando()" (click)="finalizarTransmision()">
                 {{ accionando() ? 'Finalizando…' : '⏹️ Finalizar transmisión' }}
               </button>
+            }
+          </div>
+
+          <!-- Selección de dispositivos disponibles (cuando el navegador los expone). -->
+          @if (dispositivosVideo().length > 0 || dispositivosAudio().length > 0) {
+            <div class="host-devices">
+              @if (dispositivosVideo().length > 0) {
+                <label class="host-device">
+                  <span>🎥 Cámara</span>
+                  <select
+                    [value]="dispositivoVideoId()"
+                    (change)="cambiarDispositivoVideo($any($event.target).value)"
+                  >
+                    @for (d of dispositivosVideo(); track d.deviceId) {
+                      <option [value]="d.deviceId">{{ d.label || 'Cámara ' + ($index + 1) }}</option>
+                    }
+                  </select>
+                </label>
+              }
+              @if (dispositivosAudio().length > 0) {
+                <label class="host-device">
+                  <span>🎙️ Micrófono</span>
+                  <select
+                    [value]="dispositivoAudioId()"
+                    (change)="cambiarDispositivoAudio($any($event.target).value)"
+                  >
+                    @for (d of dispositivosAudio(); track d.deviceId) {
+                      <option [value]="d.deviceId">{{ d.label || 'Micrófono ' + ($index + 1) }}</option>
+                    }
+                  </select>
+                </label>
+              }
+            </div>
+          }
+
+          <!-- Productos que se promocionan durante el live. -->
+          <div class="host-products">
+            <button class="paction" (click)="toggleSelectorProductos()">
+              {{ selectorProductosVisible ? '✕ Cerrar productos' : '🛍️ Productos a promocionar (' + productosPromocionados().length + ')' }}
+            </button>
+            @if (selectorProductosVisible) {
+              <div class="selector-productos">
+                @if (catalogoCargando()) {
+                  <div class="sp-note">Cargando tu catálogo…</div>
+                } @else if (catalogoPropio().length === 0) {
+                  <div class="sp-note">Todavía no tienes productos en tu catálogo.</div>
+                } @else {
+                  <div class="sp-list">
+                    @for (p of catalogoPropio(); track p.id) {
+                      <label class="sp-item" [class.on]="estaSeleccionado(p.id)">
+                        <input
+                          type="checkbox"
+                          [checked]="estaSeleccionado(p.id)"
+                          (change)="alternarProductoSeleccionado(p.id)"
+                        >
+                        <span class="sp-name">{{ p.nombre }}</span>
+                        <span class="sp-price">${{ p.precio }}</span>
+                      </label>
+                    }
+                  </div>
+                  <button class="paction" [disabled]="productosGuardando()" (click)="guardarProductos()">
+                    {{ productosGuardando() ? 'Guardando…' : '💾 Guardar productos' }}
+                  </button>
+                }
+              </div>
             }
           </div>
           @if (camaraError()) {
