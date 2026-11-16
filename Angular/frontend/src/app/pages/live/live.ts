@@ -143,8 +143,18 @@ export class LiveComponent implements OnInit, OnDestroy {
   rolLiveKit = signal<RolLiveKit | null>(null);
   livekitEstado = signal<EstadoLiveKit>('inactivo');
   livekitError = signal<string | null>(null);
-  /** Llega video del anfitrión (espectador). */
-  videoRemotoActivo = signal(false);
+  /** Pistas remotas suscritas (se enganchan al <video> del espectador). */
+  private readonly pistasRemotas = signal<RemoteTrack[]>([]);
+  /**
+   * ¿Está el espectador recibiendo la cámara del anfitrión?
+   * Se DERIVA de las pistas remotas realmente suscritas (única fuente de
+   * verdad). Antes era un booleano que se activaba a mano con `TrackSubscribed`
+   * y se reseteaba al conectar, de modo que un evento perdido o fuera de orden
+   * dejaba el <video> oculto aunque el anfitrión sí estuviera emitiendo.
+   */
+  readonly videoRemotoActivo = computed(() =>
+    this.pistasRemotas().some((p) => p.kind === Track.Kind.Video)
+  );
   /** El navegador bloqueó el audio: hace falta un gesto del usuario. */
   audioBloqueado = signal(false);
   micActivo = signal(false);
@@ -180,8 +190,6 @@ export class LiveComponent implements OnInit, OnDestroy {
   private room: Room | null = null;
   private conectandoLiveKit = false;
   private limpiarEventosSala: (() => void) | null = null;
-  /** Pistas remotas suscritas (se enganchan al <video> del espectador). */
-  private readonly pistasRemotas = signal<RemoteTrack[]>([]);
   /** Pista de cámara local del anfitrión que se está publicando. */
   private readonly pistaVideoLocal = signal<Track | null>(null);
   /** Pista de pantalla local del anfitrión que se está publicando (compartir pantalla). */
@@ -773,20 +781,66 @@ export class LiveComponent implements OnInit, OnDestroy {
     return this.transmision()?.estado === 'en_vivo';
   }
 
-  iniciarTransmision(): void {
+  /**
+   * Inicia la emisión. El ORDEN importa: primero se entra a la sala de LiveKit y
+   * se publica cámara/micrófono y SÓLO después se marca la transmisión como
+   * `en_vivo`. Así una transmisión "EN VIVO" siempre tiene un anfitrión
+   * publicando y ningún comprador se queda viendo "Esperando a que el anfitrión
+   * publique su video…".
+   */
+  async iniciarTransmision(): Promise<void> {
     if (this.accionando()) return;
     this.accionando.set(true);
-    this.transmisiones.iniciar(this.transmisionId).subscribe({
-      next: () => {
-        this.accionando.set(false);
-        this.toast.ok('Transmisión en vivo');
-        this.recargarTransmision();
-      },
-      error: (err: ErrorHttp) => {
-        this.accionando.set(false);
-        this.toast.err(this.mensajeError(err, 'No se pudo iniciar la transmisión.'));
+    try {
+      if (!(await this.publicarAntesDeEmitir())) {
+        this.toast.err(
+          this.livekitError() ??
+            this.camaraError() ??
+            'No se pudo iniciar la emisión: revisa la cámara y el micrófono e inténtalo de nuevo.'
+        );
+        return;
       }
-    });
+      await firstValueFrom(this.transmisiones.iniciar(this.transmisionId));
+      this.toast.ok('Transmisión en vivo');
+      this.recargarTransmision();
+    } catch (err) {
+      this.toast.err(this.mensajeError(err as ErrorHttp, 'No se pudo iniciar la transmisión.'));
+    } finally {
+      this.accionando.set(false);
+    }
+  }
+
+  /**
+   * Entra a la sala (si no estaba dentro) y publica la cámara del anfitrión.
+   * Devuelve `false` si no se consiguió publicar video: en ese caso la
+   * transmisión NO debe marcarse EN VIVO, para no presentar como funcional una
+   * emisión sin video. El backend concede el rol 'anfitrion' al propietario
+   * aunque la transmisión todavía esté en estado `programada`.
+   */
+  private async publicarAntesDeEmitir(): Promise<boolean> {
+    if (!this.room) await this.conectarLiveKit();
+    const room = this.room;
+    if (!room || this.rolLiveKit() !== 'anfitrion') return false;
+
+    if (!room.localParticipant.isCameraEnabled) {
+      try {
+        const pub = await room.localParticipant.setCameraEnabled(true);
+        if (this.room === room) this.pistaVideoLocal.set(pub?.videoTrack ?? null);
+      } catch (err) {
+        this.camaraError.set(this.mensajeCamara(err));
+        return false;
+      }
+    }
+    if (!room.localParticipant.isMicrophoneEnabled) {
+      // El audio no bloquea la emisión: el video ya está publicado.
+      try {
+        await room.localParticipant.setMicrophoneEnabled(true);
+      } catch (err) {
+        this.camaraError.set(this.mensajeCamara(err));
+      }
+    }
+    this.actualizarEstadoLocal(room);
+    return room.localParticipant.isCameraEnabled;
   }
 
   finalizarTransmision(): void {
@@ -1004,8 +1058,11 @@ export class LiveComponent implements OnInit, OnDestroy {
       this.limpiarEventosSala = limpiar;
       this.rolLiveKit.set(datos.rol);
       this.livekitEstado.set('conectado');
-      this.videoRemotoActivo.set(false);
       this.audioBloqueado.set(!room.canPlaybackAudio);
+      // El anfitrión puede estar publicando YA (el espectador entra en una
+      // emisión en curso): se sincronizan las pistas realmente suscritas para no
+      // depender de que llegue un `TrackSubscribed` concreto.
+      this.reconciliarPistasRemotas(room);
 
       if (datos.rol === 'anfitrion') await this.publicarComoAnfitrion(room);
     } catch (err) {
@@ -1030,54 +1087,35 @@ export class LiveComponent implements OnInit, OnDestroy {
    * función que los retira.
    */
   private registrarEventosSala(room: Room): () => void {
-    const alSuscribir = (track: RemoteTrack): void => {
-      // La pantalla compartida viaja en su propia pista (source = ScreenShare) y
-      // se muestra en un <video> aparte que SUSTITUYE a la cámara del anfitrión.
-      // El audio del sistema (ScreenShareAudio) y el micrófono siguen yendo al
-      // elemento de vídeo remoto normal.
-      if (track.source === Track.Source.ScreenShare) {
-        // Nunca debe quedar más de una pista de pantalla enganchada.
-        const anterior = this.pistaPantallaRemota();
-        if (anterior && anterior !== track) anterior.detach();
-        this.pistaPantallaRemota.set(track);
-        return;
-      }
-      this.pistasRemotas.update((ps) => (ps.includes(track) ? ps : [...ps, track]));
-      if (track.kind === Track.Kind.Video) this.videoRemotoActivo.set(true);
-    };
-
-    const alDesuscribir = (track: RemoteTrack): void => {
-      track.detach();
-      if (track.source === Track.Source.ScreenShare) {
-        this.pistaPantallaRemota.update((p) => (p === track ? null : p));
-        return;
-      }
-      this.pistasRemotas.update((ps) => ps.filter((p) => p !== track));
-      if (track.kind === Track.Kind.Video) {
-        this.videoRemotoActivo.set(this.pistasRemotas().some((p) => p.kind === Track.Kind.Video));
-      }
-    };
-
-    const alCambiarParticipantes = (): void =>
-      this.videoRemotoActivo.set(this.pistasRemotas().some((p) => p.kind === Track.Kind.Video));
+    // Cualquier alta/baja de pista o participante se resuelve RELEYENDO el
+    // estado real de la sala (fuente de verdad única). Así el <video> del
+    // espectador refleja siempre lo que el anfitrión publica, aunque un evento
+    // llegue tarde, se pierda o su orden no sea el esperado.
+    const alCambiarPistas = (): void => this.reconciliarPistasRemotas(room);
 
     const alDesconectar = (): void => {
       // Sólo interesa la desconexión no provocada por nosotros (p. ej. red).
       if (this.room !== room || this.finalizada()) return;
-      this.videoRemotoActivo.set(false);
+      this.limpiarPistasRemotas();
       this.livekitEstado.set('error');
       this.livekitError.set('Se perdió la conexión con la emisión. Reintenta para volver a entrar.');
     };
 
     const alReconectar = (): void => this.livekitEstado.set('reconectando');
-    const alReconectado = (): void => this.livekitEstado.set('conectado');
+    const alReconectado = (): void => {
+      this.livekitEstado.set('conectado');
+      // Tras una reconexión LiveKit vuelve a suscribir: se relee el estado real.
+      this.reconciliarPistasRemotas(room);
+    };
     const alAudio = (): void => this.audioBloqueado.set(!room.canPlaybackAudio);
     const alTrackLocal = (): void => this.actualizarEstadoLocal(room);
 
-    room.on(RoomEvent.TrackSubscribed, alSuscribir);
-    room.on(RoomEvent.TrackUnsubscribed, alDesuscribir);
-    room.on(RoomEvent.ParticipantConnected, alCambiarParticipantes);
-    room.on(RoomEvent.ParticipantDisconnected, alCambiarParticipantes);
+    room.on(RoomEvent.TrackSubscribed, alCambiarPistas);
+    room.on(RoomEvent.TrackUnsubscribed, alCambiarPistas);
+    room.on(RoomEvent.TrackPublished, alCambiarPistas);
+    room.on(RoomEvent.TrackUnpublished, alCambiarPistas);
+    room.on(RoomEvent.ParticipantConnected, alCambiarPistas);
+    room.on(RoomEvent.ParticipantDisconnected, alCambiarPistas);
     room.on(RoomEvent.Disconnected, alDesconectar);
     room.on(RoomEvent.Reconnecting, alReconectar);
     room.on(RoomEvent.Reconnected, alReconectado);
@@ -1087,10 +1125,12 @@ export class LiveComponent implements OnInit, OnDestroy {
     room.on(RoomEvent.LocalTrackUnpublished, alTrackLocal);
 
     return () => {
-      room.off(RoomEvent.TrackSubscribed, alSuscribir);
-      room.off(RoomEvent.TrackUnsubscribed, alDesuscribir);
-      room.off(RoomEvent.ParticipantConnected, alCambiarParticipantes);
-      room.off(RoomEvent.ParticipantDisconnected, alCambiarParticipantes);
+      room.off(RoomEvent.TrackSubscribed, alCambiarPistas);
+      room.off(RoomEvent.TrackUnsubscribed, alCambiarPistas);
+      room.off(RoomEvent.TrackPublished, alCambiarPistas);
+      room.off(RoomEvent.TrackUnpublished, alCambiarPistas);
+      room.off(RoomEvent.ParticipantConnected, alCambiarPistas);
+      room.off(RoomEvent.ParticipantDisconnected, alCambiarPistas);
       room.off(RoomEvent.Disconnected, alDesconectar);
       room.off(RoomEvent.Reconnecting, alReconectar);
       room.off(RoomEvent.Reconnected, alReconectado);
@@ -1099,6 +1139,47 @@ export class LiveComponent implements OnInit, OnDestroy {
       room.off(RoomEvent.TrackUnmuted, alTrackLocal);
       room.off(RoomEvent.LocalTrackUnpublished, alTrackLocal);
     };
+  }
+
+  /**
+   * Reconstruye `pistasRemotas` y `pistaPantallaRemota` a partir de las pistas
+   * que la sala tiene REALMENTE suscritas (publicaciones con `track`). Es la
+   * fuente de verdad: se llama al entrar a la sala, al cambiar cualquier pista o
+   * participante y al reconectar, de modo que el espectador ve el video del
+   * anfitrión en cuanto está disponible, sin refrescar la página.
+   */
+  private reconciliarPistasRemotas(room: Room): void {
+    if (this.room !== null && this.room !== room) return;
+
+    const normales: RemoteTrack[] = [];
+    const pantallas: RemoteTrack[] = [];
+    room.remoteParticipants.forEach((participante) => {
+      participante.trackPublications.forEach((publicacion) => {
+        const pista = publicacion.track;
+        if (!pista) return; // no suscrita todavía (sin medio recibido)
+        if (publicacion.source === Track.Source.ScreenShare) pantallas.push(pista);
+        else normales.push(pista);
+      });
+    });
+
+    // Fuera de la sala, las pistas retiradas ya no se enganchan a ningún <video>.
+    for (const anterior of this.pistasRemotas()) {
+      if (!normales.includes(anterior)) anterior.detach();
+    }
+    for (const anterior of [this.pistaPantallaRemota()]) {
+      if (anterior && !pantallas.includes(anterior)) anterior.detach();
+    }
+
+    this.pistasRemotas.set(normales);
+    this.pistaPantallaRemota.set(pantallas[0] ?? null);
+  }
+
+  /** Suelta las pistas remotas (desconexión o cambio de transmisión). */
+  private limpiarPistasRemotas(): void {
+    for (const pista of this.pistasRemotas()) pista.detach();
+    this.pistaPantallaRemota()?.detach();
+    this.pistasRemotas.set([]);
+    this.pistaPantallaRemota.set(null);
   }
 
   /**
@@ -1305,11 +1386,9 @@ export class LiveComponent implements OnInit, OnDestroy {
     const limpiar = this.limpiarEventosSala;
     this.room = null;
     this.limpiarEventosSala = null;
-    this.pistasRemotas.set([]);
+    this.limpiarPistasRemotas();
     this.pistaVideoLocal.set(null);
     this.pistaPantallaLocal.set(null);
-    this.pistaPantallaRemota.set(null);
-    this.videoRemotoActivo.set(false);
     this.audioBloqueado.set(false);
     this.micActivo.set(false);
     this.rolLiveKit.set(null);
