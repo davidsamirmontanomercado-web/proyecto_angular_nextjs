@@ -226,15 +226,16 @@ export class TransmisionesService {
   }
 
   /** El anfitrión reemplaza la lista de productos promocionados de su transmisión. */
-  guardarProductosTransmision(
-    id: string,
-    productos: number[]
-  ): Observable<{ id: string; productos: number[] }> {
-    return this.http.put<{ data: { id: string; productos: number[] } }>(
-      `${this.apiUrl}/${id}/productos`,
-      { productos }
-    ).pipe(map((res) => res.data));
-  }
+/** El anfitrión reemplaza la lista de productos promocionados de su transmisión. */
+guardarProductosTransmision(
+  id: string,
+  productos: string[]
+): Observable<{ id: string; productos: string[] }> {
+  return this.http.put<{ data: { id: string; productos: string[] } }>(
+    `${this.apiUrl}/${id}/productos`,
+    { productos }
+  ).pipe(map((res) => res.data));
+}
 
   /**
    * Sube la imagen de portada a Supabase Storage (bucket `portadas`) vía API y
