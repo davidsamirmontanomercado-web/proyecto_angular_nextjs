@@ -126,7 +126,7 @@ export class LiveComponent implements OnInit, OnDestroy {
   /** Catálogo propio del anfitrión (sólo se carga para el propietario). */
   catalogoPropio = signal<Producto[]>([]);
   /** Ids seleccionados por el anfitrión en el selector. */
-  seleccionProductos = signal<number[]>([]);
+  seleccionProductos = signal<string[]>([]);
   catalogoCargando = signal(false);
   productosGuardando = signal(false);
   /** El anfitrión abre/cierra el selector de productos. */
@@ -569,15 +569,17 @@ export class LiveComponent implements OnInit, OnDestroy {
     }
   }
 
-  estaSeleccionado(productoId: number): boolean {
-    return this.seleccionProductos().includes(productoId);
-  }
+  estaSeleccionado(productoId: string): boolean {
+  return this.seleccionProductos().includes(productoId);
+}
 
-  alternarProductoSeleccionado(productoId: number): void {
-    this.seleccionProductos.update((ids) =>
-      ids.includes(productoId) ? ids.filter((x) => x !== productoId) : [...ids, productoId]
-    );
-  }
+  alternarProductoSeleccionado(productoId: string): void {
+  this.seleccionProductos.update((ids) =>
+    ids.includes(productoId)
+      ? ids.filter((x) => x !== productoId)
+      : [...ids, productoId]
+  );
+}
 
   /** Guarda la selección de productos promocionados (sólo el anfitrión). */
   guardarProductos(): void {
