@@ -115,7 +115,8 @@ export interface TokenLiveKit {
  * backend; nunca expone datos privados del vendedor).
  */
 export interface ProductoPromocionado {
-  producto_id: number;
+  /** UUID del producto (coincide con `Producto.id`; nunca un número). */
+  producto_id: string;
   orden: number;
   nombre: string;
   descripcion: string | null;
@@ -225,17 +226,19 @@ export class TransmisionesService {
       .pipe(map((res) => res.data ?? []));
   }
 
-  /** El anfitrión reemplaza la lista de productos promocionados de su transmisión. */
-/** El anfitrión reemplaza la lista de productos promocionados de su transmisión. */
-guardarProductosTransmision(
-  id: string,
-  productos: string[]
-): Observable<{ id: string; productos: string[] }> {
-  return this.http.put<{ data: { id: string; productos: string[] } }>(
-    `${this.apiUrl}/${id}/productos`,
-    { productos }
-  ).pipe(map((res) => res.data));
-}
+  /**
+   * El anfitrión reemplaza la lista de productos promocionados de su transmisión.
+   * Los ids son UUID (`string`), igual que `Producto.id`.
+   */
+  guardarProductosTransmision(
+    id: string,
+    productos: string[]
+  ): Observable<{ id: string; productos: string[] }> {
+    return this.http.put<{ data: { id: string; productos: string[] } }>(
+      `${this.apiUrl}/${id}/productos`,
+      { productos }
+    ).pipe(map((res) => res.data));
+  }
 
   /**
    * Sube la imagen de portada a Supabase Storage (bucket `portadas`) vía API y

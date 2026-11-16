@@ -9,7 +9,7 @@
 --
 -- Modelo:
 --   * `public.transmision_productos` es la tabla de relación N:N entre
---     transmisiones (uuid) y productos (id numérico).
+--     transmisiones (uuid) y productos (uuid).
 --   * NO duplica columnas: el detalle del producto vive sólo en `productos`.
 --   * `orden` permite fijar un orden de presentación estable en la interfaz.
 --
@@ -26,8 +26,8 @@
 --
 -- Tipos (verificados en el proyecto):
 --   * `transmisiones.id` es uuid.
---   * `productos.id` es numérico (la migración 20261103120000 ya lo referencia
---     como bigint en `pedido_items`).
+--   * `productos.id` es uuid: la API valida el id de producto con UUID_RE en
+--     /api/productos/[id] y el frontend tipa `Producto.id` como string.
 --
 -- Aplicación (manual, NO automática):
 --   A) Panel de Supabase -> SQL Editor -> pegar y ejecutar.
@@ -40,7 +40,7 @@
 -- =============================================================================
 create table if not exists public.transmision_productos (
   transmision_id uuid   not null references public.transmisiones(id) on delete cascade,
-  producto_id    bigint not null references public.productos(id)     on delete cascade,
+  producto_id    uuid   not null references public.productos(id)     on delete cascade,
   orden          integer not null default 0,
   created_at     timestamptz not null default now(),
   primary key (transmision_id, producto_id)
