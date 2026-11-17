@@ -37,6 +37,10 @@ export async function POST(request: Request) {
     const siteUrl = getBaseUrl(request).replace(/\/+$/, '');
     const callbackUrl = `${siteUrl}/api/auth/callback`;
 
+    // Diagnóstico: sólo se registra el inicio del proceso. Nunca el correo del
+    // solicitante (dato personal) ni ningún token.
+    console.log('[Auth Recuperar] Inicio del proceso de recuperación de contraseña.');
+
     const admin = await createAdminSupabase();
 
     // Se genera el token de recuperación con la API de administración. No se
@@ -54,13 +58,17 @@ export async function POST(request: Request) {
 
     if (error || !hashedToken) {
       // Causa habitual: el correo no pertenece a ninguna cuenta. Se responde
-      // igual que en el caso correcto para no revelar si existe.
-      console.error(
-        '[Auth Recuperar] No se generó el enlace de recuperación:',
-        error?.message || 'hashed_token ausente'
-      );
+      // igual que en el caso correcto para no revelar si existe. Se registra el
+      // motivo técnico de Supabase, nunca el correo ni el token.
+      console.error('[Auth Recuperar] No se generó el enlace de recuperación:', {
+        motivo: error?.message || 'hashed_token ausente',
+        status: error?.status,
+      });
       return CORS.json(request, RESPUESTA_GENERICA, 200);
     }
+
+    // Diagnóstico: el enlace existe. Nunca se registra el `hashed_token`.
+    console.log('[Auth Recuperar] Enlace de recuperación generado correctamente.');
 
     const enlace = `${callbackUrl}?token_hash=${encodeURIComponent(hashedToken)}&type=recovery`;
 
@@ -82,14 +90,41 @@ export async function POST(request: Request) {
     });
 
     if (!emailRes.ok) {
-      // Fallo de infraestructura de MailerSend (clave inválida, dominio no
-      // verificado, cuenta pendiente...). Se registra el diagnóstico en
-      // servidor sin incluir credenciales ni tokens y se responde igual que en
-      // el caso correcto para no revelar información.
-      console.error('[Auth Recuperar] MailerSend no aceptó el envío:', {
-        statusCode: emailRes.error?.statusCode,
+      // MailerSend RECHAZÓ la petición (clave inválida, dominio no verificado,
+      // remitente no autorizado, límite del plan...). Se registra el
+      // diagnóstico en servidor sin credenciales ni tokens y se responde igual
+      // que en el caso correcto para no revelar información.
+      console.error('[Auth Recuperar] MailerSend RECHAZÓ el envío del correo de recuperación:', {
+        statusCode: emailRes.statusCode,
         code: emailRes.error?.code,
         message: emailRes.error?.message,
+        campos: emailRes.error?.campos,
+        codigos: emailRes.error?.codigos,
+      });
+    } else if (emailRes.estado !== 'encolado') {
+      // CASO CRÍTICO: MailerSend devolvió 2xx (petición aceptada) pero el correo
+      // NO se entregará: el envío está pausado o el destinatario está suprimido.
+      // Es exactamente la situación en la que "todo indica éxito" y el correo no
+      // llega, así que se registra como error.
+      console.error(
+        '[Auth Recuperar] MailerSend aceptó la petición pero el correo NO se entregará:',
+        {
+          estado: emailRes.estado,
+          statusCode: emailRes.statusCode,
+          envioPausado: emailRes.envioPausado,
+          // Sin messageId cuando todos los destinatarios están suprimidos: el
+          // mensaje nunca se creó.
+          messageId: emailRes.messageId,
+          avisos: emailRes.avisos,
+        }
+      );
+    } else {
+      // Único caso realmente correcto: 202 + `x-message-id`, sin avisos ni
+      // pausa. El mensaje está en cola; la entrega final se comprueba en el
+      // panel de MailerSend (Activity) con ese `messageId`.
+      console.log('[Auth Recuperar] Correo encolado por MailerSend.', {
+        statusCode: emailRes.statusCode,
+        messageId: emailRes.messageId,
       });
     }
 
