@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { EmailOtpType } from '@supabase/supabase-js';
 import { createServerSupabase, authCookieOptions } from '@/lib/supabase/server';
 import { getAllowedOrigins, getBaseUrl } from '@/lib/api/http';
 
@@ -31,11 +32,61 @@ function resolveAngularBase(request: Request): string {
   return (noLocal ?? allowed[0]).replace(/\/+$/, '');
 }
 
+// Canjea el `token_hash` de un enlace de correo (por ahora, recuperación de
+// contraseña) por una sesión real con `verifyOtp`. Este endpoint lo usa el
+// enlace que construye /api/auth/recuperar; ver allí por qué no se reenvía el
+// `action_link` de Supabase.
+async function handleEmailOtp(
+  request: Request,
+  tokenHash: string,
+  otpType: string,
+  baseUrl: string
+): Promise<NextResponse> {
+  try {
+    const supabase = await createServerSupabase();
+    const { data, error } = await supabase.auth.verifyOtp({
+      type: otpType as EmailOtpType,
+      token_hash: tokenHash,
+    });
+
+    if (error || !data.session) {
+      console.error('[Auth Callback] verifyOtp falló:', error?.message);
+      const url = new URL('/google-auth/login', baseUrl);
+      url.searchParams.set('error', 'invalid_token');
+      url.searchParams.set('desc', 'El enlace es inválido o ha caducado. Solicita uno nuevo.');
+      return NextResponse.redirect(url);
+    }
+
+    if (otpType === 'recovery') {
+      const angularBase = resolveAngularBase(request);
+      const recoveryUrl = new URL(`${angularBase}/restablecer-contrasena`);
+      recoveryUrl.searchParams.set('token', data.session.access_token);
+      return NextResponse.redirect(recoveryUrl);
+    }
+
+    // Otros tipos de enlace de correo no se usan todavía en este proyecto.
+    return NextResponse.redirect(new URL('/google-auth/login', baseUrl));
+  } catch (err) {
+    console.error('[Auth Callback] Error canjeando el token de correo:', err);
+    const url = new URL('/google-auth/login', baseUrl);
+    url.searchParams.set('error', 'server_error');
+    return NextResponse.redirect(url);
+  }
+}
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
+  const tokenHash = requestUrl.searchParams.get('token_hash');
+  const otpType = requestUrl.searchParams.get('type');
   const error = requestUrl.searchParams.get('error');
   const baseUrl = getBaseUrl(request);
+
+  // Enlaces de correo (recuperación de contraseña): llegan con `token_hash` en
+  // lugar de `code`, y se canjean con `verifyOtp`.
+  if (tokenHash && otpType) {
+    return handleEmailOtp(request, tokenHash, otpType, baseUrl);
+  }
 
   if (error || !code) {
     const errorDesc = requestUrl.searchParams.get('error_description');

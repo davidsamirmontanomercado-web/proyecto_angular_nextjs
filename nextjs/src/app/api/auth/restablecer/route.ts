@@ -1,4 +1,5 @@
 import { cors, leerCuerpoJson, requireUser } from '@/lib/api/http';
+import { createAdminSupabase } from '@/lib/supabase/server';
 
 const CORS = cors('POST, OPTIONS');
 
@@ -18,25 +19,38 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Para operaciones de Auth en el servidor con un token Bearer (no cookies),
-    // necesitamos asegurar que el cliente tenga la sesión activa.
-    await auth.db.auth.setSession({
-      access_token: auth.token,
-      refresh_token: '' // No lo tenemos, pero no es crítico para updateUser
-    });
-
-    const { error } = await auth.db.auth.updateUser({
+    // El access_token (de sesión o de recuperación) ya fue validado contra
+    // GoTrue por `requireUser`, así que `auth.usuario.id` es la identidad real.
+    //
+    // No se usa `auth.db.auth.setSession(...)`: el token de recuperación no
+    // trae refresh_token, y auth-js lanza `AuthSessionMissingError` cuando el
+    // refresh_token está vacío, dejando el `updateUser` sin sesión. Ésa era la
+    // causa del 500 anterior. Se actualiza la contraseña por id con la API de
+    // administración, que es el mecanismo soportado en servidor.
+    //
+    // Importante: el id NUNCA se toma del cuerpo de la petición, siempre del
+    // token verificado, por lo que un usuario no puede cambiar la contraseña de
+    // otro.
+    const admin = await createAdminSupabase();
+    const { error } = await admin.auth.admin.updateUserById(auth.usuario.id, {
       password: newPassword,
     });
 
     if (error) {
-      console.error('[Auth Restablecer] Error:', error.message);
-      return CORS.json(request, { error: 'No se pudo restablecer la contraseña.' }, 400);
+      console.error('[Auth Restablecer] Error al actualizar la contraseña:', error.message);
+      return CORS.json(
+        request,
+        { error: 'No se pudo restablecer la contraseña. Solicita un enlace nuevo.' },
+        400
+      );
     }
 
     return CORS.json(request, { message: 'Contraseña restablecida con éxito.' }, 200);
   } catch (err) {
-    console.error('[Auth Restablecer] Error inesperado:', err);
+    console.error(
+      '[Auth Restablecer] Error inesperado:',
+      err instanceof Error ? err.message : 'desconocido'
+    );
     return CORS.json(request, { error: 'Error interno del servidor.' }, 500);
   }
 }

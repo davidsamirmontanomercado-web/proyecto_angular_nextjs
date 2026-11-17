@@ -85,7 +85,8 @@ export async function GET(
 
 // PUT /api/transmisiones/[id]/productos
 // Reemplaza por completo la lista de productos promocionados de la transmisión.
-// El cuerpo es { productos: number[] } (ids de productos del catálogo propio).
+// El cuerpo es { productos: string[] } con los UUID de productos del catálogo
+// propio del anfitrión (los ids de `productos.id` son uuid, nunca números).
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -107,13 +108,12 @@ export async function PUT(
     );
   }
 
-  const ids: number[] = [];
+  const ids: string[] = [];
   for (const valor of cuerpo.productos as unknown[]) {
-    const n = typeof valor === 'number' ? valor : Number(valor);
-    if (!Number.isInteger(n) || n <= 0) {
-      return CORS.json(request, { error: 'Cada producto debe ser un id numérico válido.' }, 400);
+    if (typeof valor !== 'string' || !UUID_RE.test(valor)) {
+      return CORS.json(request, { error: 'Cada producto debe ser un identificador (UUID) válido.' }, 400);
     }
-    if (!ids.includes(n)) ids.push(n);
+    if (!ids.includes(valor)) ids.push(valor);
   }
 
   if (ids.length > MAX_PRODUCTOS) {
@@ -165,8 +165,8 @@ export async function PUT(
         return CORS.json(request, { error: mapped!.mensaje }, mapped!.status);
       }
 
-      const permitidos = new Set((propios ?? []).map((p) => Number(p.id)));
-      const ajenos = ids.filter((n) => !permitidos.has(n));
+      const permitidos = new Set((propios ?? []).map((p) => String(p.id)));
+      const ajenos = ids.filter((productoId) => !permitidos.has(productoId));
       if (ajenos.length > 0) {
         return CORS.json(
           request,

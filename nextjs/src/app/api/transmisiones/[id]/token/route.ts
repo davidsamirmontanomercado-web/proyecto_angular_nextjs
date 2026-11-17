@@ -15,10 +15,16 @@ import type { User } from '@supabase/supabase-js';
 //
 // La transmisión se consulta con el cliente Supabase ligado al token del usuario
 // (RLS): un espectador sólo ve filas `en_vivo` (404 si ya no lo está) y el
-// propietario ve también la suya (409 si no está en vivo). Sin `service_role`.
+// propietario ve también la suya. Sin `service_role`.
+//
+// El propietario recibe token tanto en `programada` como en `en_vivo`: necesita
+// entrar a la sala para PUBLICAR su cámara y SÓLO después marcar la transmisión
+// como `en_vivo`. Así ninguna emisión aparece "EN VIVO" sin vídeo del anfitrión
+// y el comprador nunca se queda esperando una pista que no existe.
 
 const CORS = cors('POST, OPTIONS');
 const ESTADO_EN_VIVO = 'en_vivo';
+const ESTADO_PROGRAMADA = 'programada';
 
 export function OPTIONS(request: Request) {
   return CORS.empty(request);
@@ -90,7 +96,18 @@ export async function POST(
       );
     }
 
-    if (fila.estado !== ESTADO_EN_VIVO) {
+    // El rol se decide SIEMPRE en el servidor a partir de `anfitrion_id`.
+    const anfitrionId = fila.anfitrion_id as string | null;
+    const esAnfitrion = anfitrionId !== null && anfitrionId === auth.usuario.id;
+
+    // Un espectador sólo entra si la emisión está en vivo. El propietario además
+    // puede entrar en `programada` para publicar su cámara ANTES de pasar a
+    // `en_vivo` (evita anunciar una emisión sin vídeo). Nunca en estados
+    // terminales (`finalizada`/`cancelada`).
+    const estado = fila.estado as string | null;
+    const permitido =
+      estado === ESTADO_EN_VIVO || (esAnfitrion && estado === ESTADO_PROGRAMADA);
+    if (!permitido) {
       return CORS.json(
         request,
         { error: 'La transmisión no está en vivo: no se emiten tokens.' },
@@ -98,8 +115,7 @@ export async function POST(
       );
     }
 
-    const anfitrionId = fila.anfitrion_id as string | null;
-    const rol: RolLiveKit = anfitrionId === auth.usuario.id ? 'anfitrion' : 'espectador';
+    const rol: RolLiveKit = esAnfitrion ? 'anfitrion' : 'espectador';
 
     const token = await crearTokenSala({
       config,

@@ -35,10 +35,9 @@ export class RecuperarContrasenaComponent {
 
     if (res.ok) {
       this.enviado.set(true);
-      this.toast.ok('Correo de recuperación enviado');
+      this.toast.ok('Solicitud enviada');
     } else {
-      console.log('Error de recuperación:', res);
-      this.errorMsg.set(res.error || 'No se pudo enviar el correo.');
+      this.errorMsg.set(res.error || 'No se pudo enviar la solicitud.');
       this.toast.err(res.error || 'Error al enviar');
     }
   }
