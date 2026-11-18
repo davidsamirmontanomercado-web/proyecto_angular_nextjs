@@ -90,11 +90,11 @@ export async function POST(request: Request) {
     });
 
     if (!emailRes.ok) {
-      // MailerSend RECHAZÓ la petición (clave inválida, dominio no verificado,
+      // Resend RECHAZÓ la petición (clave inválida, dominio no verificado,
       // remitente no autorizado, límite del plan...). Se registra el
       // diagnóstico en servidor sin credenciales ni tokens y se responde igual
       // que en el caso correcto para no revelar información.
-      console.error('[Auth Recuperar] MailerSend RECHAZÓ el envío del correo de recuperación:', {
+      console.error('[Auth Recuperar] Resend RECHAZÓ el envío del correo de recuperación:', {
         statusCode: emailRes.statusCode,
         code: emailRes.error?.code,
         message: emailRes.error?.message,
@@ -102,27 +102,22 @@ export async function POST(request: Request) {
         codigos: emailRes.error?.codigos,
       });
     } else if (emailRes.estado !== 'encolado') {
-      // CASO CRÍTICO: MailerSend devolvió 2xx (petición aceptada) pero el correo
-      // NO se entregará: el envío está pausado o el destinatario está suprimido.
-      // Es exactamente la situación en la que "todo indica éxito" y el correo no
-      // llega, así que se registra como error.
+      // CASO CRÍTICO: Resend devolvió 2xx (petición aceptada) pero el correo
+      // NO se entregará. Se registra como error.
       console.error(
-        '[Auth Recuperar] MailerSend aceptó la petición pero el correo NO se entregará:',
+        '[Auth Recuperar] Resend aceptó la petición pero el correo NO se entregará:',
         {
           estado: emailRes.estado,
           statusCode: emailRes.statusCode,
           envioPausado: emailRes.envioPausado,
-          // Sin messageId cuando todos los destinatarios están suprimidos: el
-          // mensaje nunca se creó.
           messageId: emailRes.messageId,
           avisos: emailRes.avisos,
         }
       );
     } else {
-      // Único caso realmente correcto: 202 + `x-message-id`, sin avisos ni
-      // pausa. El mensaje está en cola; la entrega final se comprueba en el
-      // panel de MailerSend (Activity) con ese `messageId`.
-      console.log('[Auth Recuperar] Correo encolado por MailerSend.', {
+      // Caso correcto: el mensaje está en cola. La entrega final se comprueba
+      // en el panel de Resend (Logs) con ese `messageId`.
+      console.log('[Auth Recuperar] Correo encolado por Resend.', {
         statusCode: emailRes.statusCode,
         messageId: emailRes.messageId,
       });
