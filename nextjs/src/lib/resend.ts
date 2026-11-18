@@ -6,6 +6,15 @@ import { Resend } from 'resend';
 // Envía correos transaccionales (recuperación de contraseña, etc.).
 // Resend solo requiere verificación DNS (SPF/DKIM); NO exige que el dominio
 // tenga una web pública, a diferencia de MailerSend que rechazó la cuenta.
+//
+// MEJORAS DE ENTREGABILIDAD (para que los correos lleguen a la bandeja principal):
+//   1. SPF + DKIM ya configurados en el dominio (verificación de Resend).
+//   2. DMARC: AÑADE este registro TXT en tu DNS para reducir spam:
+//        Tipo: TXT | Nombre: _dmarc.signasep.site
+//        Valor: v=DMARC1; p=none; rua=mailto:davidsamirmontanomercado@gmail.com
+//   3. Remitente reconocible (no "no-reply" genérico).
+//   4. Cabecera List-Unsubscribe para cumplir normativas anti-spam.
+//   5. Contenido con texto plano equivalente al HTML.
 // =============================================================================
 
 const resend = new Resend(process.env.RESEND_API_KEY || '');
@@ -63,8 +72,14 @@ export type MailSendResult =
       error: MailError;
     };
 
+// Remitente: nombre reconocible de la marca. "no-reply" sigue siendo válido,
+// pero el nombre "LiveMarket" ayuda a los filtros a identificar el remitente.
 const fromEmail = process.env.MAIL_FROM || 'no-reply@signasep.site';
 const fromName = process.env.MAIL_FROM_NAME || 'LiveMarket';
+
+// Dirección de respuesta: a donde llegan las respuestas de los usuarios.
+// Si no se define, se usa la misma que el remitente.
+const replyToEmail = process.env.MAIL_REPLY_TO || fromEmail;
 
 /**
  * Envía un correo usando Resend y devuelve el estado REAL del envío.
@@ -86,13 +101,25 @@ export async function sendEmail({
     console.error('[Resend] RESEND_API_KEY no está definida en el entorno.');
   }
 
+  // Versión en texto plano: importante para entregabilidad. Los filtros de spam
+  // penalizan correos que solo tienen HTML sin equivalente en texto plano.
+  const textContent = text || html.replace(/<[^>]*>?/gm, '').trim();
+
   try {
     const { data, error } = await resend.emails.send({
       from: `${fromName} <${fromEmail}>`,
       to: toName ? [`${toName} <${to}>`] : [to],
+      replyTo: replyToEmail,
       subject,
       html,
-      text: text || html.replace(/<[^>]*>?/gm, ''),
+      text: textContent,
+      // Cabeceras que mejoran la entregabilidad y el cumplimiento normativo:
+      //   - List-Unsubscribe: obligatorio en muchos países, reduce spam score.
+      //   - List-Unsubscribe-Post: compatibilidad con One-Click Unsubscribe.
+      headers: {
+        'List-Unsubscribe': `<mailto:${replyToEmail}?subject=unsubscribe>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
     });
 
     if (error || !data?.id) {
