@@ -1,0 +1,92 @@
+<div class="auth">
+  <aside class="auth-brand">
+    <div class="auth-brand-inner">
+      <a routerLink="/" class="brand"><span class="brand-dot"></span>LiveMarket</a>
+      <div>
+        <div class="auth-quote">Recupera tu acceso.<br><span class="dim">En segundos.</span></div>
+        <div class="auth-features">
+          <div class="auth-feature"><span class="bullet"></span> Enlace seguro con validez de 1 hora</div>
+          <div class="auth-feature"><span class="bullet"></span> Sin preguntas de seguridad complicadas</div>
+          <div class="auth-feature"><span class="bullet"></span> Confirmación inmediata al restablecer</div>
+          <div class="auth-feature"><span class="bullet"></span> Soporte 24/7 si lo necesitas</div>
+        </div>
+      </div>
+      <div class="copy">© 2025 LiveMarket. Todos los derechos reservados.</div>
+    </div>
+  </aside>
+
+  <main class="auth-form-wrap">
+    <div class="auth-form">
+      @if (!enviado()) {
+        <div class="back-link">
+          <a routerLink="/login">
+            <span class="back-ico">←</span>
+            Volver al inicio
+          </a>
+        </div>
+        
+        <div class="form-header">
+          <h2>Recuperar acceso</h2>
+          <p class="lead">Te enviaremos un enlace seguro para restablecer tu contraseña</p>
+        </div>
+
+        @if (errorMsg()) {
+          <div class="alert alert-error show">
+            <span class="alert-ico">⚠️</span>
+            <div class="alert-content">
+              {{ errorMsg() }}
+            </div>
+          </div>
+        }
+
+        <form (ngSubmit)="onSubmit($event)" novalidate>
+          <div class="field">
+            <label class="field-label">Correo electrónico</label>
+            <div class="input-with-icon">
+              <span class="ico">✉️</span>
+              <input type="email" class="field-input" placeholder="tu@ejemplo.com"
+                     [(ngModel)]="correo" name="correo" required>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full btn-lg" [disabled]="cargando()">
+            @if (cargando()) {
+              <span class="spinner"></span>
+              <span>Enviando enlace...</span>
+            } @else {
+              <span>Enviar enlace de recuperación</span>
+            }
+          </button>
+        </form>
+
+        <p class="auth-foot">¿Recordaste tu clave? <a routerLink="/login">Inicia sesión</a></p>
+      } @else {
+        <div class="status-card success">
+          <div class="status-ico-glow">
+            <div class="success-ico"></div>
+          </div>
+          
+          <h2>¡Revisa tu bandeja!</h2>
+          
+          <p class="lead">
+            Hemos enviado un enlace seguro a <strong>{{ correo }}</strong>. El enlace expira en 60 minutos.
+          </p>
+          
+          <div class="hint-box">
+            <span class="hint-ico">💡</span>
+            <p>Si no lo ves, revisa tu carpeta de correo no deseado o spam.</p>
+          </div>
+
+          <div class="actions-stack">
+            <button type="button" class="btn btn-primary btn-full btn-lg" routerLink="/login">
+              Volver al inicio de sesión
+            </button>
+            <button type="button" class="btn btn-ghost btn-full" (click)="enviado.set(false)">
+              Intentar con otro correo
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </main>
+</div>

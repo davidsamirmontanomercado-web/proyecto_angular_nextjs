@@ -1,0 +1,7 @@
+.con-sidebar {
+  margin-left: 260px;
+  min-height: 100vh;
+  background: #f5f6fa;
+}
+
+body.modo-oscuro .con-sidebar { background: #1a1a1a; }

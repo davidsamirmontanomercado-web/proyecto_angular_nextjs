@@ -1,0 +1,21 @@
+
+npm start
+crear paginas
+npx ng g c features/auth/login
+atras cd..
+delante cd + nombre de caperta
+
+npm run dev
+
+ Remove-Item -Recurse -Force .next cache
+
+ $body = @{
+    email = "samirmercado130@gmail.com"
+    password = "Devolamelo123"
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+    -Uri "http://localhost:3000/api/auth/login" `
+    -Method POST `
+    -ContentType "application/json" `
+    -Body $body

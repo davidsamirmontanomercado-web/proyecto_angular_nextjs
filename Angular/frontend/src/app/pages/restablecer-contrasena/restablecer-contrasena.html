@@ -1,0 +1,128 @@
+<div class="auth">
+  <aside class="auth-brand">
+    <div class="auth-brand-inner">
+      <a routerLink="/" class="brand"><span class="brand-dot"></span>LiveMarket</a>
+      <div>
+        <div class="auth-quote">Una nueva contraseña.<br><span class="dim">Más seguridad.</span></div>
+        <div class="auth-features">
+          <div class="auth-feature"><span class="bullet"></span> Crea una contraseña única y segura</div>
+          <div class="auth-feature"><span class="bullet"></span> Medidor de fuerza en tiempo real</div>
+          <div class="auth-feature"><span class="bullet"></span> Recomendaciones de seguridad integradas</div>
+          <div class="auth-feature"><span class="bullet"></span> Acceso inmediato tras el cambio</div>
+        </div>
+      </div>
+      <div class="copy">© 2025 LiveMarket. Todos los derechos reservados.</div>
+    </div>
+  </aside>
+
+  <main class="auth-form-wrap">
+    <div class="auth-form">
+      @if (tokenError()) {
+        <div class="status-card error">
+          <div class="status-ico">⚠️</div>
+          <h2>Enlace no válido</h2>
+          <p class="lead">{{ tokenError() }}</p>
+          <div class="actions-stack">
+            <button type="button" class="btn btn-primary btn-full" routerLink="/recuperar-contrasena">
+              Solicitar nuevo enlace
+            </button>
+            <button type="button" class="btn btn-ghost btn-full" routerLink="/login">
+              Volver al inicio de sesión
+            </button>
+          </div>
+        </div>
+      } @else if (exito()) {
+        <div class="status-card success">
+          <div class="status-ico-glow">
+            <div class="success-ico">🛡️</div>
+          </div>
+          <h2>¡Cuenta Protegida!</h2>
+          <p class="lead">Tu contraseña ha sido actualizada con éxito. Tu cuenta ahora es más segura.</p>
+          <button type="button" class="btn btn-primary btn-full btn-lg" (click)="irAlLogin()">
+            Iniciar Sesión Ahora
+          </button>
+        </div>
+      } @else if (tokenValido()) {
+        <form (ngSubmit)="onSubmit($event)" novalidate>
+          <div class="form-header">
+            <h2>Nueva Contraseña</h2>
+            <p class="lead">Crea una clave robusta para proteger tu cuenta</p>
+          </div>
+
+          @if (errorMsg()) {
+            <div class="alert alert-error show">
+              <span class="alert-ico">⚠️</span>
+              {{ errorMsg() }}
+            </div>
+          }
+
+          <div class="field">
+            <label class="field-label">Nueva contraseña</label>
+            <div class="input-with-icon">
+              <span class="ico">🔒</span>
+              <input [type]="mostrarPass() ? 'text' : 'password'" class="field-input" placeholder="••••••••"
+                     [(ngModel)]="pass" name="pass" required>
+              <button type="button" class="toggle-pass" (click)="mostrarPass.set(!mostrarPass())">
+                {{ mostrarPass() ? '🙈' : '👁️' }}
+              </button>
+            </div>
+            
+            @if (pass) {
+              <div class="strength-meter">
+                <div class="strength-bars" [attr.data-level]="fuerza()">
+                  <div class="bar"></div>
+                  <div class="bar"></div>
+                  <div class="bar"></div>
+                  <div class="bar"></div>
+                </div>
+                <div class="strength-info">
+                  <span class="label">Seguridad: <strong>{{ fuerzaLabel() }}</strong></span>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="field">
+            <label class="field-label">Confirmar contraseña</label>
+            <div class="input-with-icon">
+              <span class="ico">�️</span>
+              <input [type]="mostrarPass2() ? 'text' : 'password'" class="field-input" placeholder="••••••••"
+                     [(ngModel)]="pass2" name="pass2" required>
+              <button type="button" class="toggle-pass" (click)="mostrarPass2.set(!mostrarPass2())">
+                {{ mostrarPass2() ? '🙈' : '👁️' }}
+              </button>
+            </div>
+            @if (pass2) {
+              @if (pass !== pass2) {
+                <div class="match-status error">Las contraseñas no coinciden</div>
+              } @else {
+                <div class="match-status success">✓ Las contraseñas coinciden</div>
+              }
+            }
+          </div>
+
+          <div class="security-tips">
+            <div class="tip">
+              <span class="dot"></span>
+              Al menos 8 caracteres y símbolos
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full btn-lg" [disabled]="cargando() || (pass !== pass2 && pass2 !== '')">
+            @if (cargando()) {
+              <span class="spinner"></span>
+              <span>Guardando...</span>
+            } @else {
+              <span>Actualizar Contraseña</span>
+            }
+          </button>
+        </form>
+      } @else {
+        <div class="loading-state">
+          <div class="loading-spinner"></div>
+          <p>Verificando seguridad...</p>
+        </div>
+      }
+    </div>
+  </main>
+</div>
