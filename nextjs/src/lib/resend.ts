@@ -11,7 +11,7 @@ import { Resend } from 'resend';
 //   1. SPF + DKIM ya configurados en el dominio (verificación de Resend).
 //   2. DMARC: AÑADE este registro TXT en tu DNS para reducir spam:
 //        Tipo: TXT | Nombre: _dmarc.signasep.site
-//        Valor: v=DMARC1; p=none; rua=mailto:davidsamirmontanomercado@gmail.com
+//        Valor: v=DMARC1; p=none; rua=mailto:jv602409@gmail.com
 //   3. Remitente reconocible (no "no-reply" genérico).
 //   4. Cabecera List-Unsubscribe para cumplir normativas anti-spam.
 //   5. Contenido con texto plano equivalente al HTML.
@@ -74,7 +74,7 @@ export type MailSendResult =
 
 // Remitente: nombre reconocible de la marca. "no-reply" sigue siendo válido,
 // pero el nombre "LiveMarket" ayuda a los filtros a identificar el remitente.
-const fromEmail = process.env.MAIL_FROM || 'no-reply@signasep.site';
+const fromEmail = process.env.MAIL_FROM || 'soporte@signasep.site';
 const fromName = process.env.MAIL_FROM_NAME || 'LiveMarket';
 
 // Dirección de respuesta: a donde llegan las respuestas de los usuarios.
